@@ -15,10 +15,14 @@
 using namespace std;
 
 struct opline{
-	char opc[5]; //longest opcodes are 4 chars, + NUL terminator
-	char opd1[11]; //Gives room for 10 digit number + NUL
-	char opd2[11];
-	char opd3[11];
+	//char opc[5]; //longest opcodes are 4 chars, + NUL terminator
+	//char opd1[11]; //Gives room for 10 digit number + NUL
+	//char opd2[11];
+	//char opd3[11];
+	int opc; //these are mapped to specific opcodes/operands
+	int opd1; //See included text file
+	int opd2;
+	int opd3;
 	unsigned int lnum; //line number of command
 };
 
@@ -29,7 +33,8 @@ struct labeldata{
 
 int fillfilelines(char filelines[][255], ifstream& asmin);
 int removecruft(char filelines[][NUM_COLS], char dest[][NUM_COLS], int numlines);
-int findlabel(char line[], char label[]);
+int findlabel(char line[], char label[], labeldata* labelstruct);
+int giveopval(char opcode[]);
 bool checkopcode(char line[], opline opdata);
 bool nonvischar(char in);
 bool alphachar(char in);
@@ -41,10 +46,11 @@ int main(int argc, char* argv[]){
 	char codelines[1000][255];
 	char labeltemp[NUM_COLS];
 	opline allopcodes[1000];
-	//Number of lines at each stage
-	int numlines1, numlines2, labelline, labellineoffset = 0, curopnum = 0;
+	labeldata labels[250];
+	int numlines1, numlines2; //Number of lines at each stage
+	int labelline, labellineoffset = 0, curopnum = 0, labelind = 0;
 	
-	//One argument that is filename, next is actual input
+	//First argument that is filename, next is actual input
 	if(argc != 2){
 		cerr << "Invalid input" << endl;
 		return -1;
@@ -63,13 +69,15 @@ int main(int argc, char* argv[]){
 	}
 	cout << endl;
 	
+	//Get labels, opcodes, and operands
 	for(int i = 0; i < numlines2; i++){
 		//First, check for a label
 		//TODO: Implement label struct array and copy labeltemp and line into an element
-		labelline = findlabel(codelines[0], labeltemp);
+		labelline = findlabel(codelines[i], labeltemp, &labels[labelind]);
 		if(labelline >= 0){
 			cout << "Now in label " << labeltemp << " at " << labelline << endl;
 			labellineoffset = 0; //reset the offset if we're in a new label
+			//cout << labels[labelind].line;
 		}
 		else if(labelline == -1){
 			//Just means there wasn't a label, check for opcode
@@ -79,10 +87,11 @@ int main(int argc, char* argv[]){
 			}
 		}
 		else{
-			//Should be only triggerred by error
-			cerr << "Invalid code, program exiting" << endl;
+			//Should be only triggered by error
+			cerr << "Invalid code in file, program exiting" << endl;
 			return -1;
 		}
+
 	}
 	
 	
@@ -100,9 +109,9 @@ int fillfilelines(char filelines[][255], ifstream& asmin){
 	//We only get the line up to the newline here
 	//The newlines get added back by the remove cruft function
 	while(asmin.good() && !asmin.eof()){	
-		char curline[255];
-		asmin.getline(curline, 253, '\n');
-		copy(curline, curline+253, filelines[line]);
+		char curline[NUM_COLS];
+		asmin.getline(curline, NUM_COLS-2, '\n');
+		copy(curline, curline+NUM_COLS-2, filelines[line]);
 		line++;
 	}
 	
@@ -171,10 +180,12 @@ int removecruft(char filelines[][NUM_COLS], char dest[][NUM_COLS], int numlines)
 }
 
 //Goes through the label until the colon, and tries to parse the address
+//Also stores them in a given struct that will be part of array
 //Returns address of label
 //Returns -1 if no label found
 //Returns -100 on error
-int findlabel(char line[], char label[]){
+//Valid label chars: alpha for first, pretty much anything except colon/ws after
+int findlabel(char line[], char label[], labeldata* labelstruct){
 	int ind = 0;
 	int colloc, endloc, address;
 	bool foundcol = false;
@@ -194,6 +205,10 @@ int findlabel(char line[], char label[]){
 		if(line[ind] == ':'){
 			colloc = ind;
 			foundcol = true;
+			label[ind] = '\0'; //once colon is found, label name is over
+		}
+		if(!foundcol){
+			label[ind] = line[ind]; //fill in the label name
 		}
 		//if we encounter an invalid character
 		/* every invalid character should already have been handled
@@ -210,7 +225,7 @@ int findlabel(char line[], char label[]){
 	}
 	
 	
-	cout << "Found colon at " << colloc << endl;
+	//cout << "Found colon at " << colloc << endl;
 	
 	//Get all the numeric characters into an array
 	int numind = 0;
@@ -233,6 +248,11 @@ int findlabel(char line[], char label[]){
 	//Convert the array into an int
 	address = atoi(foundnum);
 	
+	//Copy the found label and address into struct
+	//Since labelstruct is a pointer to a struct, have to use special member operator
+	copy(label, label+colloc-1, labelstruct->label);
+	labelstruct->line = address;
+		
 	cout << endl << "Found label with address " << address << endl;
 	
 	return address;
@@ -246,8 +266,46 @@ bool nonvischar(char in){
 	}
 }
 
+/*In a given line, we expect an opcode to be there
+* Might be 4, 3, or 2 chars
+* After that, depending on the opcode, we expect certain 
+* combinations of register/number
+* Find the opcode, find if its operands are valid
+* Opcode/operands then mapped to number values (giveopval function)
+*/
 bool checkopcode(char line[], opline opdata){
-	cout << "one day" << endl;
+	//cout << "one day" << endl;
+	//All the opcodes stored by their character length
+	int opcval = 0;
+	bool opmatch = true;
+	char opcodes4[6][5]{"ADDi", "SUBi", "MULi", "DIVi", "JGEZ", "JLEZ"};
+	char opcodes3[10][4]{"LDi", "SDi", "ADD", "SUB", "MUL", "DIV", "JMP", "JNZ", "JGZ", "JLZ"};
+	char opcodes2[3][3]{"LD", "SD", "JZ"};
+	
+	//The line given should have no leading whitespace or extraneous characters
+	//Check the 4 char opcodes first
+	for(int op = 0; op < 6; op++){
+		opmatch = true;
+		//pretty much a crap word cmp, should write one
+		for(int ind = 0; ind < 5; ind++){
+			if(line[ind] == '\0' || opcodes4[op][ind] == '\0'){
+				break;
+			}
+			//if we get a non matching char
+			if(!(line[ind] == opcodes4[op][ind])){
+				opmatch = false;
+				break;
+			}
+		}
+		//if the opcode is still a match
+		if(opmatch){
+			opcval = giveopval(opcodes4[op]);
+			opdata.opc = opcval;
+		}	
+	}
+	
+	cerr << "Error parsing opcodes and operands" << endl;
+	return false;
 }
 
 //Returns if a character is valid for a label

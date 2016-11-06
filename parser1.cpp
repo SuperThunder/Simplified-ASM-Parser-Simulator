@@ -36,10 +36,14 @@ char* slice(char line[], int left, int right);
 void fubar();
 
 struct opline{
-	char opc[5]; //longest opcodes are 4 chars, + NUL terminator
-	char opd1[11]; //Gives room for 10 digit number + NUL
-	char opd2[11];
-	char opd3[11];
+	//char opc[5]; //longest opcodes are 4 chars, + NUL terminator
+	int opnum; //the integer value of the opcode
+	//char opd1[11]; //Gives room for 10 digit number + NUL
+	//char opd2[11];
+	//char opd3[11];
+	int opd1; //operands are a positive number if nnnn, or negative if register
+	int opd2;
+	int opd3;
 	unsigned int lnum; //line number of command
 };
 
@@ -154,6 +158,9 @@ bool validopc(char opc[]){
 		while(opc[ind] != '\0'){
 			if(opc[ind] != opcodes[NUM_OPC][ind]){
 				match = false;
+			}
+			else{
+				ind++;
 			}
 		}
 		if(match == true){

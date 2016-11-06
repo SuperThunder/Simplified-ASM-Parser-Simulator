@@ -29,9 +29,17 @@ JGEZ: 11
 JLZ: 12
 JLEZ: 13
 
+----------------
+OPCODE TYPES
+----------------
+Opcodes can be grouped into types based on what operands they can have
+
+Type 1:
+
 -----------------
 REGISTERS
 -----------------
+Project specification states 99 registers (what kind of machine is this?)
 As 0 is a possible nnnn value, there is no register 0
 R1: -1
 R2: -2
@@ -41,10 +49,12 @@ R5: -5
 R6: -6
 R7: -7
 R8: -8
+etc
 The value of a 32bit int leaves us with room for about 2 billion more registers
 
 -----------------
 INTEGER VALUES
 -----------------
+An integer value might be used for a Add/Sub/Mul/Div operation, as a code location to jump to, or as a memory location for a LD/SD op.
 While values greater than 9999 should not be expected, especially for memory locations, the system should still be able to handle them. Addition into the millions could be reasonably expected.
-An integer value might be used for a Add/Sub/Mul/Div operation, as a code location to jump to, or as a memory location to load or store
+
