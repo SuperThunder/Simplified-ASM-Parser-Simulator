@@ -23,6 +23,7 @@ struct opline{
 	int opd1; //See included text file
 	int opd2;
 	int opd3;
+	int optype;
 	unsigned int lnum; //line number of command
 };
 
@@ -35,10 +36,11 @@ int fillfilelines(char filelines[][255], ifstream& asmin);
 int removecruft(char filelines[][NUM_COLS], char dest[][NUM_COLS], int numlines);
 int findlabel(char line[], char label[], labeldata* labelstruct);
 int giveopval(char opcode[], int oplen);
-bool checkopcode(char line[], opline opdata);
+bool checkopcode(char line[], opline &opdata);
 bool toupper(char line[]);
 bool nonvischar(char in);
 bool alphachar(char in);
+bool cmpop(char op1[], char op2[]);
 //bool alphanumpunc(char in);
 bool numchar(char in);
 int wordcmp(char str1[], char str2[]);
@@ -50,7 +52,8 @@ int main(int argc, char* argv[]){
 	opline allopcodes[1000];
 	labeldata labels[250];
 	int numlines1, numlines2; //Number of lines at each stage
-	int labelline, labellineoffset = 0, curopnum = 0, labelind = 0;
+	int labelline, prevlabelline;
+	int labellineoffset = 0, curopnum = 0, labelind = 0;
 	
 	//First argument that is filename, next is actual input
 	if(argc != 2){
@@ -81,26 +84,54 @@ int main(int argc, char* argv[]){
 	//Get labels, opcodes, and operands
 	for(int i = 0; i < numlines2; i++){
 		//First, check for a label
-		//TODO: Implement label struct array and copy labeltemp and line into an element
+		//labelline finds the line of the label, and stores them in the labels struct array
+
+		//cout << "Label: " << labelline << "Prevlabel: " << prevlabelline << endl;
 		labelline = findlabel(codelines[i], labeltemp, &labels[labelind]);
 		if(labelline >= 0){
 			cout << "Now in label " << labeltemp << " at " << labelline << endl;
+			//cout << "Now in label " << labels[labelind].label << " at " << labels[labelind].line << endl;
 			labellineoffset = 0; //reset the offset if we're in a new label
-			//cout << labels[labelind].line;
+			labelind += 1;
 		}
 		else if(labelline == -1){
 			//Just means there wasn't a label, check for opcode
 			if(checkopcode(codelines[i], allopcodes[curopnum])){
-				cout << "Found new opcode" << endl;
+				cout << "Found new opcode " << allopcodes[curopnum].opc;
+				cout << " on line: " << prevlabelline+1 << endl;
+				allopcodes[curopnum].lnum = prevlabelline + 1;
 				curopnum += 1;
+				labelline = prevlabelline + 1;
+				labellineoffset += 1;
+			}else{
+			
+			//this is out here since after a label line with no value
+			//checkopcode isn't going to be true
+			labelline = prevlabelline; //no +1 here is a very subtle difference
+			labellineoffset += 1;
 			}
+			
+		}
+		else if(labelline == -2){
+			//We found a label, but it didn't have a specific line
+			//Work off the distance from the known label line
+			//This does rely on people AT LEAST giving the code label a line
+			labellineoffset += 1;
+			labelline = prevlabelline + 1;
+			labels[labelind].line = prevlabelline + 1;
+			//cout << "Now in label " << labeltemp << " at " << labelline << endl;
+			cout << "Now in label " << labels[labelind].label << " at " << labels[labelind].line << endl;
+			labelind += 1;
+			
 		}
 		else{
 			//Should be only triggered by error
 			cerr << "Invalid code in file, program exiting" << endl;
 			return -1;
 		}
-
+			//cout << prevlabelline << " = " << labelline;
+			prevlabelline = labelline;
+		
 	}
 	
 	
@@ -192,6 +223,7 @@ int removecruft(char filelines[][NUM_COLS], char dest[][NUM_COLS], int numlines)
 //Also stores them in a given struct that will be part of array
 //Returns address of label
 //Returns -1 if no label found
+//Returns -2 if a label is present, but has no specific number
 //Returns -100 on error
 //Valid label chars: alpha for first, pretty much anything except colon/ws after
 int findlabel(char line[], char label[], labeldata* labelstruct){
@@ -233,6 +265,12 @@ int findlabel(char line[], char label[], labeldata* labelstruct){
 		return -1;
 	}
 	
+	//No number after colon
+	if(line[colloc+1] == '\0' || line[colloc+1] == '\n'){
+		copy(label, label+colloc, labelstruct->label);
+		cout << endl << "Found label with no new address " << endl;
+		return -2;
+	}
 	
 	//cout << "Found colon at " << colloc << endl;
 	
@@ -255,11 +293,13 @@ int findlabel(char line[], char label[], labeldata* labelstruct){
 	foundnum[numind] = '\0';
 	
 	//Convert the array into an int
+	//Using atoi is sketchy, but we already checked the chars
+	//And we're not going to have an address bigger than 2.4 billion
 	address = atoi(foundnum);
 	
 	//Copy the found label and address into struct
 	//Since labelstruct is a pointer to a struct, have to use special member operator
-	copy(label, label+colloc-1, labelstruct->label);
+	copy(label, label+colloc, labelstruct->label);
 	labelstruct->line = address;
 		
 	cout << endl << "Found label with address " << address << endl;
@@ -282,7 +322,7 @@ bool nonvischar(char in){
 * Find the opcode, find if its operands are valid
 * Opcode/operands then mapped to number values (giveopval function)
 */
-bool checkopcode(char line[], opline opdata){
+bool checkopcode(char line[], opline &opdata){
 	//cout << "one day" << endl;
 	//All the opcodes stored by their character length
 	int opcval = 0, oplen;
@@ -295,7 +335,7 @@ bool checkopcode(char line[], opline opdata){
 	//Check the 4 char opcodes first
 	for(int op = 0; op < 6; op++){
 		opmatch = true;
-		//pretty much a crap word cmp, should write one
+		//pretty much a bad word cmp, should write one
 		for(int ind = 0; ind < 5; ind++){
 			if(line[ind] == '\0' || opcodes4[op][ind] == '\0'){
 				return false;
@@ -318,7 +358,6 @@ bool checkopcode(char line[], opline opdata){
 	//Check the 3 char opcodes
 	for(int op = 0; op < 10; op++){
 		opmatch = true;
-		//pretty much a crap word cmp, should write one
 		for(int ind = 0; ind < 4; ind++){
 			if(line[ind] == '\0' || opcodes3[op][ind] == '\0'){
 				break;
@@ -341,7 +380,6 @@ bool checkopcode(char line[], opline opdata){
 	//Check the 2 char opcodes
 	for(int op = 0; op < 4; op++){
 		opmatch = true;
-		//pretty much a crap word cmp, should write one
 		for(int ind = 0; ind < 3; ind++){
 			if(line[ind] == '\0' || opcodes2[op][ind] == '\0'){
 				break;
@@ -382,16 +420,96 @@ bool toupper (char line[]){
 int giveopval(char opcode[], int oplen){
 	switch(oplen){
 		case 4:
+			if(cmpop(opcode, "ADDI")){
+				return 300;
+			}
+			else if(cmpop(opcode, "SUBI")){
+				return 400;
+			}
+			else if(cmpop(opcode, "MULI")){
+				return 500;
+			}
+			else if(cmpop(opcode, "DIVI")){
+				return 600;
+			}
+			else if(cmpop(opcode, "JGEZ")){
+				return 11;
+			}
+			else if(cmpop(opcode, "JLEZ")){
+				return 13;
+			}
+			else{
+				cerr << "Error: Reached end of opcode values for valid opcode" << endl;
+				return -1;
+			}
+			break;
 			
-			break;
 		case 3:
+			if(cmpop(opcode, "LDI")){
+				return 100;
+			}
+			else if(cmpop(opcode, "SDI")){
+				return 200;
+			}
+			else if(cmpop(opcode, "ADD")){
+				return 3;
+			}
+			else if(cmpop(opcode, "SUB")){
+				return 4;
+			}
+			else if(cmpop(opcode, "MUL")){
+				return 5;
+			}
+			else if(cmpop(opcode, "DIV")){
+				return 6;
+			}
+			else if(cmpop(opcode, "JMP")){
+				return 7;
+			}
+			else if(cmpop(opcode, "JNZ")){
+				return 8;
+			}
+			else if(cmpop(opcode, "JGZ")){
+				return 10;
+			}
+			else if(cmpop(opcode, "JLZ")){
+				return 12;
+			}
+			else{
+				cerr << "Error: Reached end of opcode values for valid opcode" << endl;
+				return -1;
+			}
 			break;
+			
 		case 2:
+			if(cmpop(opcode, "LD")){
+				return 1;
+			}
+			else if(cmpop(opcode, "SD")){
+				return 2;
+			}
+			else if(cmpop(opcode, "JZ")){
+				return 7;
+			}
+			else{
+				cerr << "Error: Reached end of opcode values for valid opcode" << endl;
+			}
 			break;
+			
 		default:
 			cerr << "Invalid call to operator value assignment" << endl;
 			return -1;
 			break;
+	}
+}
+
+bool cmpop(char op1[], char op2[]){
+	//if the opcodes are the same character array
+	if(wordcmp(op1, op2) == 0){
+		return true;
+	}
+	else{
+		return false;
 	}
 }
 
@@ -491,7 +609,11 @@ int wordcmp(char str1[], char str2[]){
  * 
  * weird requirement: case insensitive
  * opcodes:
- * 		need to figure out what the opcode is and store that
+ * 		√need to figure out what the opcode is and store that
  * 		need to figure out operands and store them
- * 		need to get current line number and store that with opdata
+ * 			check validity too
+ * 		√need to get current line number and store that with opdata
+ * 
+ * rest:
+ * 		get the statistics calculated and printed out
  */
