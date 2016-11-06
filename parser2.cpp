@@ -34,12 +34,14 @@ struct labeldata{
 int fillfilelines(char filelines[][255], ifstream& asmin);
 int removecruft(char filelines[][NUM_COLS], char dest[][NUM_COLS], int numlines);
 int findlabel(char line[], char label[], labeldata* labelstruct);
-int giveopval(char opcode[]);
+int giveopval(char opcode[], int oplen);
 bool checkopcode(char line[], opline opdata);
+bool toupper(char line[]);
 bool nonvischar(char in);
 bool alphachar(char in);
 //bool alphanumpunc(char in);
 bool numchar(char in);
+int wordcmp(char str1[], char str2[]);
 
 int main(int argc, char* argv[]){
 	char filelines[1000][255];
@@ -68,6 +70,13 @@ int main(int argc, char* argv[]){
 		cout << i << ':' << '\t' << codelines[i];
 	}
 	cout << endl;
+	
+	cout << "With unnecessary cases changed: " << endl;
+	for(int i = 0; i < numlines2; i++){
+		toupper(codelines[i]);
+		cout << codelines[i];
+	}
+	
 	
 	//Get labels, opcodes, and operands
 	for(int i = 0; i < numlines2; i++){
@@ -269,17 +278,17 @@ bool nonvischar(char in){
 /*In a given line, we expect an opcode to be there
 * Might be 4, 3, or 2 chars
 * After that, depending on the opcode, we expect certain 
-* combinations of register/number
+* combinations of register/number -> do in different function
 * Find the opcode, find if its operands are valid
 * Opcode/operands then mapped to number values (giveopval function)
 */
 bool checkopcode(char line[], opline opdata){
 	//cout << "one day" << endl;
 	//All the opcodes stored by their character length
-	int opcval = 0;
+	int opcval = 0, oplen;
 	bool opmatch = true;
-	char opcodes4[6][5]{"ADDi", "SUBi", "MULi", "DIVi", "JGEZ", "JLEZ"};
-	char opcodes3[10][4]{"LDi", "SDi", "ADD", "SUB", "MUL", "DIV", "JMP", "JNZ", "JGZ", "JLZ"};
+	char opcodes4[6][5]{"ADDI", "SUBI", "MULI", "DIVI", "JGEZ", "JLEZ"};
+	char opcodes3[10][4]{"LDI", "SDI", "ADD", "SUB", "MUL", "DIV", "JMP", "JNZ", "JGZ", "JLZ"};
 	char opcodes2[3][3]{"LD", "SD", "JZ"};
 	
 	//The line given should have no leading whitespace or extraneous characters
@@ -289,6 +298,7 @@ bool checkopcode(char line[], opline opdata){
 		//pretty much a crap word cmp, should write one
 		for(int ind = 0; ind < 5; ind++){
 			if(line[ind] == '\0' || opcodes4[op][ind] == '\0'){
+				return false;
 				break;
 			}
 			//if we get a non matching char
@@ -299,13 +309,90 @@ bool checkopcode(char line[], opline opdata){
 		}
 		//if the opcode is still a match
 		if(opmatch){
-			opcval = giveopval(opcodes4[op]);
+			oplen = 4;
+			opcval = giveopval(opcodes4[op], oplen);
 			opdata.opc = opcval;
-		}	
+			return true; //at this point we should be all good for opcode value
+		}
 	}
+	//Check the 3 char opcodes
+	for(int op = 0; op < 10; op++){
+		opmatch = true;
+		//pretty much a crap word cmp, should write one
+		for(int ind = 0; ind < 4; ind++){
+			if(line[ind] == '\0' || opcodes3[op][ind] == '\0'){
+				break;
+			}
+			//if we get a non matching char
+			if(!(line[ind] == opcodes3[op][ind])){
+				opmatch = false;
+				break;
+			}
+		}
+		//if the opcode is still a match
+		if(opmatch){
+			oplen = 3;
+			opcval = giveopval(opcodes3[op], oplen);
+			opdata.opc = opcval;
+			return true;
+		}
+	}	
+	
+	//Check the 2 char opcodes
+	for(int op = 0; op < 4; op++){
+		opmatch = true;
+		//pretty much a crap word cmp, should write one
+		for(int ind = 0; ind < 3; ind++){
+			if(line[ind] == '\0' || opcodes2[op][ind] == '\0'){
+				break;
+			}
+			//if we get a non matching char
+			if(!(line[ind] == opcodes2[op][ind])){
+				opmatch = false;
+				break;
+			}
+		}
+		//if the opcode is still a match
+		if(opmatch){
+			oplen = 2;
+			opcval = giveopval(opcodes2[op], oplen);
+			opdata.opc = opcval;
+			return true;
+		}
+	}	
 	
 	cerr << "Error parsing opcodes and operands" << endl;
 	return false;
+}
+
+//given a set of characters by reference, converts any abcz to ABCZ
+bool toupper (char line[]){
+	int ind = 0;
+	
+	while(line[ind] != '\0'){
+		if(line[ind] >= 97 && line[ind] <= 122){
+			line[ind] -= 32; //flip the 6th bit off to get UCASE
+		}
+		ind++;
+	}
+	
+	return true;
+}
+
+int giveopval(char opcode[], int oplen){
+	switch(oplen){
+		case 4:
+			
+			break;
+		case 3:
+			break;
+		case 2:
+			break;
+		default:
+			cerr << "Invalid call to operator value assignment" << endl;
+			return -1;
+			break;
+	}
 }
 
 //Returns if a character is valid for a label
@@ -352,6 +439,27 @@ bool alphachar(char in){
 		return false;
 	}
 }
+
+int wordcmp(char str1[], char str2[]){
+	//cout << "SEGSEGSEG" << endl;	
+	//cout << str1[0] << "\t" << str2[0] << endl;
+	if(str1[0]==0 && str2[0]==0){
+		return 0;
+	}
+	if(str1[0] == str2[0]){
+		//keep calling strCmp until one is different than the cover
+		return wordcmp(str1+1, str2+1); //this is trippy
+	}
+	//str1 comes before alphabet than string2
+	//Technically this covers \0 cases too
+	else if(str1[0] < str2[0]){
+		return 1;
+	}
+	//Covers the case of char1 > char2: first word is later in the alphabet
+	else{
+		return -1;
+	}
+}
 /* √Can reprocess code into pure 2d array with multiple filters
  * √Commented line, whitespace line, etc
  * √Then for remaining lines strip out comments and leading/trailing whitespace
@@ -381,6 +489,7 @@ bool alphachar(char in){
  * 			check the operands are valid
  * 			store the opcode, operands and line # in the struct array
  * 
+ * weird requirement: case insensitive
  * opcodes:
  * 		need to figure out what the opcode is and store that
  * 		need to figure out operands and store them

@@ -33,8 +33,24 @@ JLEZ: 13
 OPCODE TYPES
 ----------------
 Opcodes can be grouped into types based on what operands they can have
+By opcode name:
+Type 1: nnnn, Ri: LD, LDi, SDi
+Type 2: Ri, Rj: LD, SD
+Type 3: mmmm, nnnn: SDi
+Type 4: Ri, nnnn: SD, JZ, JNZ, JGZ, JGEZ, JLZ, JLEZ
+Type 5: Ri, Rj, Rk: ADD, SUB, MUL, DIV
+Type 6: Ri, nnnn, Rk: ADDi, SUBi, MULi, DIVi
+Type 7: nnnn: JMP
 
-Type 1:
+By opcode value:
+Type 1: nnnn, Ri: 1, 100, 200
+Type 2: Ri, Rj: 1, 2
+Type 3: mmmm, nnnn: 200
+Type 4: Ri, nnnn: 2, 8, 9, 10, 11, 12, 13
+Type 5: Ri, Rj, Rk: 3, 4, 5, 6
+Type 6: Ri, nnnn, Rk: 300, 400, 500, 600
+Type 7: nnnn: 7
+
 
 -----------------
 REGISTERS
@@ -56,5 +72,5 @@ The value of a 32bit int leaves us with room for about 2 billion more registers
 INTEGER VALUES
 -----------------
 An integer value might be used for a Add/Sub/Mul/Div operation, as a code location to jump to, or as a memory location for a LD/SD op.
-While values greater than 9999 should not be expected, especially for memory locations, the system should still be able to handle them. Addition into the millions could be reasonably expected.
+While the specification only shows values up to 4 digits, there are ambiguities that threaten much bigger numbers. Addition into the millions could be reasonably expected.
 
