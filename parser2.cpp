@@ -324,15 +324,16 @@ bool nonvischar(char in){
 * Find the opcode, find if its operands are valid
 * Opcode/operands then mapped to number values (giveopval function)
 */
-bool checkopcode(char line[], opline &opdata){
+bool checkopcode(char* line, opline &opdata){
 	//cout << "one day" << endl;
 	//All the opcodes stored by their character length
-	int opcval = 0, oplen;
+	int opcval = 0, oplen, oprtype;
 	bool opmatch = true;
 	char opcodes4[6][5]{"ADDI", "SUBI", "MULI", "DIVI", "JGEZ", "JLEZ"};
 	char opcodes3[10][4]{"LDI", "SDI", "ADD", "SUB", "MUL", "DIV", "JMP", "JNZ", "JGZ", "JLZ"};
 	char opcodes2[3][3]{"LD", "SD", "JZ"};
 	
+	//cout << "Line + 2: " << (line+2) << endl; //this SHOULD be perfectly valid
 	//The line given should have no leading whitespace or extraneous characters
 	//Check the 4 char opcodes first
 	for(int op = 0; op < 6; op++){
@@ -352,8 +353,12 @@ bool checkopcode(char line[], opline &opdata){
 		//if the opcode is still a match
 		if(opmatch){
 			oplen = 4;
+			//get and set the opcode value
 			opcval = giveopval(opcodes4[op], oplen);
 			opdata.opc = opcval;
+			//get and set the operand type values
+			oprtype = giveoptype(line+oplen, opcval, opdata);
+			opdata.optype = oprtype;
 			return true; //at this point we should be all good for opcode value
 		}
 	}
@@ -375,6 +380,9 @@ bool checkopcode(char line[], opline &opdata){
 			oplen = 3;
 			opcval = giveopval(opcodes3[op], oplen);
 			opdata.opc = opcval;
+			//get and set the operand type values
+			oprtype = giveoptype(line+oplen, opcval, opdata);
+			opdata.optype = oprtype;
 			return true;
 		}
 	}	
@@ -397,6 +405,9 @@ bool checkopcode(char line[], opline &opdata){
 			oplen = 2;
 			opcval = giveopval(opcodes2[op], oplen);
 			opdata.opc = opcval;
+			//get and set the operand type values
+			oprtype = giveoptype(line+oplen, opcval, opdata);
+			opdata.optype = oprtype;
 			return true;
 		}
 	}	
@@ -515,28 +526,85 @@ int giveoptype(char operands[], int opval, opline &opdata){
 	int ind = 0, curopind = 0, oprind = 0;
 	int opr[3];
 	char curop[11];
+	//cout << operands;
+	
 	//get the optype by checking each operand
-	while(operands[ind] != '\0'){
-		//the ind-1 means we get the , or \0 char, but dont overshoot
-		while(operands[ind-1] != ',' && operands[ind-1] != '\0'){
-			curop[curopind] = operands[ind];
+	while(operands[ind] != 0 && operands[ind] != '\n'){
+		//cout << operands[ind] << " ";
+
+		if(operands[ind] == ','){
+			curop[curopind] = '\0';
+			//cout << "Sending: " << curop << endl;
+			retcode = giveoperand(curop);
+			if(retcode == -1000){
+				cerr << "Error: Invalid operands" << endl;
+				return -1;
+			}
+			opr[oprind] = retcode; //set the operand type that was found
+			oprind++;
+			curopind = 0;
 			ind++;
 		}
-		operands[ind] = '\0'; //add it just in case for the comma cases
-		retcode = giveoperand(curop);
-		if(retcode == -1000){
-			cerr << "Error: Invalid operands" << endl;
-			return -1;
-		}
 		else{
-			opr[oprind] = retcode; //set the operand type that was found
-		}
-		
+			//cout << "Putting " << operands[ind] << " in" << endl;
+			curop[curopind] = operands[ind];
+			curopind++;
+			ind++;
+		}	
 	}
+	
+	//GIANT SWITCHES HERE TO DETERMINE OPTYPE BY OPERANDS
+	
+	return 1;
 	
 	
 	cerr << "Invalid operands given" << endl;
 	return -1;
+}
+
+//Finds a single operand (Register or number)
+//The segm passed to this should be the chars between commas, including comma
+//In the case of the last operand, the NUL replaces comma
+int giveoperand(char segm[]){
+	//1 digit register
+	int regval;
+	//cout << "Checking: " << segm << endl;
+	//Need to check for two digits first, since a valid two digit is a valid one digit
+	if(segm[0] == 'R' && numchar(segm[1]) && numchar(segm[2])){
+		regval = 10*(segm[1]-'0')+(segm[2]-'0');
+		cout << "Found register__: " << regval << endl; 
+		return regval*-1;
+	}
+	//2 digit register
+	else if(segm[0] == 'R' && numchar(segm[1])){
+		regval = int(segm[1]-'0');
+		//cout << "Found register_: " << regval << endl; 
+		return regval*-1;
+	}
+	
+	//Number operand
+	//If we get a none numerical character here
+	//There is no valid operand
+	int ind = 0;
+	char num[20];
+	while(segm[ind] != '\0' && segm[ind] != ','){
+		if(numchar(segm[ind])){
+			//cout << "Adding: " << segm[ind];
+			num[ind] = segm[ind];
+			ind++;
+		}
+		else{
+			cerr << "Error: Invalid character for numerical operand" << endl;
+			return -1000;
+		}
+	}
+	num[ind] = '\0';
+	//cout << "Found number: " << atoi(num) << endl;
+	return atoi(num);
+	
+	cerr << "How did this even happen?" << endl;
+	return -1000;
+
 }
 
 bool cmpop(char op1[], char op2[]){
@@ -594,46 +662,6 @@ bool alphachar(char in){
 	}
 }
 
-//Finds a single operand (Register or number)
-//The segm passed to this should be the chars between commas, including comma
-//In the case of the last operand, the NUL replaces comma
-int giveoperand(char segm[]){
-	//1 digit register
-	int regval;
-	//Need to check for two digits first, since a valid two digit is a valid one digit
-	if(segm[0] == 'R' && numchar(segm[1]) && numchar(segm[2])){
-		regval = segm[1] - 48;
-		return regval;
-	}
-	//2 digit register
-	else if(segm[0] == 'R' && numchar(segm[1])){
-		regval = 10*(segm[1]-48)+(segm[2]-48);
-		return regval;
-	}
-	
-	//Number operand
-	//If we get a none numerical character here
-	//There is no valid operand
-	int ind = 0;
-	char num[20];
-	while(segm[ind] != '\0' && segm[ind] != ','){
-		if(numchar(segm[ind])){
-			num[ind] = segm[ind];
-			ind++;
-		}
-		else{
-			cerr << "Error: Invalid character for numerical operand" << endl;
-			return -1000;
-		}
-	}
-	num[ind] = '\0';
-	cout << "Found number: " << atoi(num) << endl;
-	return atoi(num);
-	
-	cerr << "How did this even happen?" << endl;
-	return -1000;
-
-}
 
 int wordcmp(char str1[], char str2[]){
 	//cout << "SEGSEGSEG" << endl;	
