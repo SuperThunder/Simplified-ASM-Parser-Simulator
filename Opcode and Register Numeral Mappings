@@ -51,7 +51,6 @@ Type 5: Ri, Rj, Rk: 3, 4, 5, 6
 Type 6: Ri, nnnn, Rk: 300, 400, 500, 600
 Type 7: nnnn: 7
 
-
 -----------------
 REGISTERS
 -----------------
@@ -66,6 +65,7 @@ R6: -6
 R7: -7
 R8: -8
 etc
+R99: -99
 The value of a 32bit int leaves us with room for about 2 billion more registers
 
 -----------------

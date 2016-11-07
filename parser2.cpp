@@ -23,7 +23,7 @@ struct opline{
 	int opd1; //See included text file
 	int opd2;
 	int opd3;
-	int optype;
+	int optype; //the type (1 to 7) of operands the opcode has
 	unsigned int lnum; //line number of command
 };
 
@@ -36,6 +36,8 @@ int fillfilelines(char filelines[][255], ifstream& asmin);
 int removecruft(char filelines[][NUM_COLS], char dest[][NUM_COLS], int numlines);
 int findlabel(char line[], char label[], labeldata* labelstruct);
 int giveopval(char opcode[], int oplen);
+int giveoptype(char operands[], int opval, opline &opdata);
+int giveoperand(char segm[]);
 bool checkopcode(char line[], opline &opdata);
 bool toupper(char line[]);
 bool nonvischar(char in);
@@ -67,6 +69,8 @@ int main(int argc, char* argv[]){
 	numlines1 = fillfilelines(filelines, asmin);
 	numlines2 = removecruft(filelines, codelines, numlines1);
 	
+	//Once this simulator is FULLY OPERATIONAL
+	//We'll probably want to move all the file/parse stuff to a new function
 	cout << "With cruft removed: " << numlines2 << " lines" << endl;
 	
 	for(int i = 0; i < numlines2; i++){
@@ -104,11 +108,10 @@ int main(int argc, char* argv[]){
 				labelline = prevlabelline + 1;
 				labellineoffset += 1;
 			}else{
-			
-			//this is out here since after a label line with no value
-			//checkopcode isn't going to be true
-			labelline = prevlabelline; //no +1 here is a very subtle difference
-			labellineoffset += 1;
+				//this is out here since after a label line with no value
+				//checkopcode isn't going to be true
+				labelline = prevlabelline; //no +1 here is a very subtle difference
+				labellineoffset += 1;
 			}
 			
 		}
@@ -158,7 +161,6 @@ int fillfilelines(char filelines[][255], ifstream& asmin){
 	for(int i = 0; i < line; i++){
 		cout << filelines[i] << endl;
 	}
-	
 	
 	return line;
 }
@@ -318,7 +320,7 @@ bool nonvischar(char in){
 /*In a given line, we expect an opcode to be there
 * Might be 4, 3, or 2 chars
 * After that, depending on the opcode, we expect certain 
-* combinations of register/number -> do in different function
+* combinations of register/number
 * Find the opcode, find if its operands are valid
 * Opcode/operands then mapped to number values (giveopval function)
 */
@@ -417,6 +419,7 @@ bool toupper (char line[]){
 	return true;
 }
 
+//Return the numerical value of an opcode
 int giveopval(char opcode[], int oplen){
 	switch(oplen){
 		case 4:
@@ -503,6 +506,39 @@ int giveopval(char opcode[], int oplen){
 	}
 }
 
+//Give the numerical value of an opcode's operand types
+//Note that they might not be valid for the opcode on the line 
+//				- that needs to be checked
+//Opval -> possible operands -> error or return Optype
+int giveoptype(char operands[], int opval, opline &opdata){
+	int comloc, retcode;
+	int ind = 0, curopind = 0, oprind = 0;
+	int opr[3];
+	char curop[11];
+	//get the optype by checking each operand
+	while(operands[ind] != '\0'){
+		//the ind-1 means we get the , or \0 char, but dont overshoot
+		while(operands[ind-1] != ',' && operands[ind-1] != '\0'){
+			curop[curopind] = operands[ind];
+			ind++;
+		}
+		operands[ind] = '\0'; //add it just in case for the comma cases
+		retcode = giveoperand(curop);
+		if(retcode == -1000){
+			cerr << "Error: Invalid operands" << endl;
+			return -1;
+		}
+		else{
+			opr[oprind] = retcode; //set the operand type that was found
+		}
+		
+	}
+	
+	
+	cerr << "Invalid operands given" << endl;
+	return -1;
+}
+
 bool cmpop(char op1[], char op2[]){
 	//if the opcodes are the same character array
 	if(wordcmp(op1, op2) == 0){
@@ -556,6 +592,47 @@ bool alphachar(char in){
 	else{
 		return false;
 	}
+}
+
+//Finds a single operand (Register or number)
+//The segm passed to this should be the chars between commas, including comma
+//In the case of the last operand, the NUL replaces comma
+int giveoperand(char segm[]){
+	//1 digit register
+	int regval;
+	//Need to check for two digits first, since a valid two digit is a valid one digit
+	if(segm[0] == 'R' && numchar(segm[1]) && numchar(segm[2])){
+		regval = segm[1] - 48;
+		return regval;
+	}
+	//2 digit register
+	else if(segm[0] == 'R' && numchar(segm[1])){
+		regval = 10*(segm[1]-48)+(segm[2]-48);
+		return regval;
+	}
+	
+	//Number operand
+	//If we get a none numerical character here
+	//There is no valid operand
+	int ind = 0;
+	char num[20];
+	while(segm[ind] != '\0' && segm[ind] != ','){
+		if(numchar(segm[ind])){
+			num[ind] = segm[ind];
+			ind++;
+		}
+		else{
+			cerr << "Error: Invalid character for numerical operand" << endl;
+			return -1000;
+		}
+	}
+	num[ind] = '\0';
+	cout << "Found number: " << atoi(num) << endl;
+	return atoi(num);
+	
+	cerr << "How did this even happen?" << endl;
+	return -1000;
+
 }
 
 int wordcmp(char str1[], char str2[]){
@@ -612,6 +689,8 @@ int wordcmp(char str1[], char str2[]){
  * 		√need to figure out what the opcode is and store that
  * 		need to figure out operands and store them
  * 			check validity too
+ * 			first find out what OpType is happening and store that
+ * 			then find the actual number / register values and store those
  * 		√need to get current line number and store that with opdata
  * 
  * rest:
