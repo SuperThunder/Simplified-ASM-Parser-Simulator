@@ -23,8 +23,9 @@ struct opline{
 	int opd1; //See included text file
 	int opd2;
 	int opd3;
+	int oplen;
 	int optype; //the type (1 to 7) of operands the opcode has
-	unsigned int lnum; //line number of command
+	int lnum; //line number of command
 };
 
 struct labeldata{
@@ -36,9 +37,10 @@ int fillfilelines(char filelines[][255], ifstream& asmin);
 int removecruft(char filelines[][NUM_COLS], char dest[][NUM_COLS], int numlines);
 int findlabel(char line[], char label[], labeldata* labelstruct);
 int giveopval(char opcode[], int oplen);
-int giveoptype(char operands[], int opval, opline &opdata);
+int giveoptype(char operands[], int opval, opline* opdata);
 int giveoperand(char segm[]);
-bool checkopcode(char line[], opline &opdata);
+bool checkopcode(char line[], opline* opdata);
+bool validopt(int opval, int optype);
 bool toupper(char line[]);
 bool nonvischar(char in);
 bool alphachar(char in);
@@ -46,6 +48,7 @@ bool cmpop(char op1[], char op2[]);
 //bool alphanumpunc(char in);
 bool numchar(char in);
 int wordcmp(char str1[], char str2[]);
+void dispStats(opline* opdata[]);
 
 int main(int argc, char* argv[]){
 	char filelines[1000][255];
@@ -100,10 +103,26 @@ int main(int argc, char* argv[]){
 		}
 		else if(labelline == -1){
 			//Just means there wasn't a label, check for opcode
-			if(checkopcode(codelines[i], allopcodes[curopnum])){
+			if(checkopcode(codelines[i], &allopcodes[curopnum])){
+				/*
 				cout << "Found new opcode " << allopcodes[curopnum].opc;
 				cout << " on line: " << prevlabelline+1 << endl;
+				*/
+				//get and set the operand type values
+				//cout << "Calling giveoptype with: " << codelines[i]+allopcodes[curopnum].oplen << endl;
+				//cout << "\t" << allopcodes[curopnum].opc;
+				//cout << "\t" << allopcodes[curopnum].lnum << endl;
 				allopcodes[curopnum].lnum = prevlabelline + 1;
+				allopcodes[curopnum].optype = giveoptype(\
+				(codelines[i]+allopcodes[curopnum].oplen), allopcodes[curopnum].opc,\
+				&allopcodes[curopnum]);
+				
+				cout << "Found new opcode " << allopcodes[curopnum].opc;
+				cout << " on line: " << allopcodes[curopnum].lnum;
+				cout << " with type: " << allopcodes[curopnum].optype << endl;
+				//cout << " with length: " << allopcodes[curopnum].oplen << endl;
+				
+				//iterate counters
 				curopnum += 1;
 				labelline = prevlabelline + 1;
 				labellineoffset += 1;
@@ -324,7 +343,7 @@ bool nonvischar(char in){
 * Find the opcode, find if its operands are valid
 * Opcode/operands then mapped to number values (giveopval function)
 */
-bool checkopcode(char* line, opline &opdata){
+bool checkopcode(char* line, opline* opdata){
 	//cout << "one day" << endl;
 	//All the opcodes stored by their character length
 	int opcval = 0, oplen, oprtype;
@@ -339,6 +358,7 @@ bool checkopcode(char* line, opline &opdata){
 	for(int op = 0; op < 6; op++){
 		opmatch = true;
 		//pretty much a bad word cmp, should write one
+		//and a string tokenizer/splitter
 		for(int ind = 0; ind < 5; ind++){
 			if(line[ind] == '\0' || opcodes4[op][ind] == '\0'){
 				return false;
@@ -355,10 +375,13 @@ bool checkopcode(char* line, opline &opdata){
 			oplen = 4;
 			//get and set the opcode value
 			opcval = giveopval(opcodes4[op], oplen);
-			opdata.opc = opcval;
+			opdata->opc = opcval;
+			opdata->oplen = oplen; //forgetting to add this caused quite the bugs
+			/* this functionality moved to main
 			//get and set the operand type values
 			oprtype = giveoptype(line+oplen, opcval, opdata);
 			opdata.optype = oprtype;
+			*/
 			return true; //at this point we should be all good for opcode value
 		}
 	}
@@ -379,10 +402,13 @@ bool checkopcode(char* line, opline &opdata){
 		if(opmatch){
 			oplen = 3;
 			opcval = giveopval(opcodes3[op], oplen);
-			opdata.opc = opcval;
+			opdata->opc = opcval;
+			opdata->oplen = oplen; 
+			/*
 			//get and set the operand type values
 			oprtype = giveoptype(line+oplen, opcval, opdata);
 			opdata.optype = oprtype;
+			*/
 			return true;
 		}
 	}	
@@ -404,10 +430,13 @@ bool checkopcode(char* line, opline &opdata){
 		if(opmatch){
 			oplen = 2;
 			opcval = giveopval(opcodes2[op], oplen);
-			opdata.opc = opcval;
+			opdata->opc = opcval;
+			opdata->oplen = oplen;
 			//get and set the operand type values
+			/*
 			oprtype = giveoptype(line+oplen, opcval, opdata);
 			opdata.optype = oprtype;
+			*/
 			return true;
 		}
 	}	
@@ -426,6 +455,8 @@ bool toupper (char line[]){
 		}
 		ind++;
 	}
+	//Shouldn't be needed, but safety first
+	line[ind] = '\0';
 	
 	return true;
 }
@@ -521,45 +552,297 @@ int giveopval(char opcode[], int oplen){
 //Note that they might not be valid for the opcode on the line 
 //				- that needs to be checked
 //Opval -> possible operands -> error or return Optype
-int giveoptype(char operands[], int opval, opline &opdata){
-	int comloc, retcode;
+int giveoptype(char operands[], int opval, opline* opdata){
+	int retcode, comloc;
 	int ind = 0, curopind = 0, oprind = 0;
 	int opr[3];
 	char curop[11];
-	//cout << operands;
+	//cout << "Operands: " << operands << endl;
 	
 	//get the optype by checking each operand
-	while(operands[ind] != 0 && operands[ind] != '\n'){
+	//while(operands[ind] != 0 && operands[ind] != '\n'){
 		//cout << operands[ind] << " ";
-
-		if(operands[ind] == ','){
+	//Strong suspicion this func isn't being passed a NUL at the end
+	for(int ind = 0; operands[ind] != '\0'; ind++){
+		
+		if(operands[ind] == ',' || operands[ind] == '\0' || operands[ind] == '\n'){
+			//cout << "Encountered: " << int(operands[ind]) << endl;
 			curop[curopind] = '\0';
 			//cout << "Sending: " << curop << endl;
 			retcode = giveoperand(curop);
+			//cout << "Was returned: " << retcode << endl;
 			if(retcode == -1000){
 				cerr << "Error: Invalid operands" << endl;
 				return -1;
 			}
+			//cout << "Returned: " << retcode << endl;
+			//cout << "Filling: " << oprind << endl;
 			opr[oprind] = retcode; //set the operand type that was found
+			//cout << "Increased oprind: " << oprind+1 << " " << oprind << endl;
 			oprind++;
 			curopind = 0;
-			ind++;
 		}
 		else{
 			//cout << "Putting " << operands[ind] << " in" << endl;
 			curop[curopind] = operands[ind];
 			curopind++;
-			ind++;
 		}	
+		
+		//Awful bug without below: doesn't 'cap' curop
+		curop[curopind+1] = '\0';
+		//cout << "Curop: " << curop << endl;
+		
+		//ind++;
+	}
+	//store the operand values in the struct array members
+	//opdata->opd1 = opr[0]; opdata->opd2 = opr[1]; opdata->opd3 = opr[2];
+	switch(oprind){
+		case 3:
+			opdata->opd3 = opr[2];
+		case 2:
+			opdata->opd2 = opr[1];
+		case 1:
+			opdata->opd1 = opr[0]; 
+			break;
+		default:
+			cerr << "How did the opr ind even get here?";
 	}
 	
-	//GIANT SWITCHES HERE TO DETERMINE OPTYPE BY OPERANDS
+	//GIANT SWITCHES/IFS HERE TO DETERMINE OPTYPE BY OPERANDS
+	//Figure out what optype is present
+	//AND if that optype is valid for the opcode
 	
-	return 1;
+	//I get the distinct feeling this whole structure could be smaller
+	//cout << opdata->lnum << " operands: " << opr[0] << " " << opr[1] << " " << opr[2] << endl;
+	switch(oprind){
+		//one argument: only JMP
+		//type 7
+		case 1:
+			if(validopt(opval, 7)){
+				return 7;
+			}
+			else{
+				cerr << "Error: Invalid operands for opcode";
+				return -1;
+			}
+		//two arguments: LDx2, LDi, SDix2, SDx2, all the cond. jumps
+		//type 1, 2, 3, or 4
+		case 2:
+			//type 1 or 3: operand 0 is numerical
+			if(opr[0] >= 0){
+				//type 3: SDi: operand 1 numerical
+				if(opr[1] >= 0){
+					//cout << "Triggering for: " << opr[1] << endl;
+					if(validopt(opval, 3)){
+						return 3;
+					}
+					else{
+						cerr << "Error: Invalid operands for opcode" << endl;
+						return -1;
+					}
+				}
+				//type 1: LD, LDi, SDi: operand 1 is register
+				else{ //operand 1 is register
+					//cout << "Register: " << opr[1] << endl;
+					if(validopt(opval, 1)){
+						return 1;
+					}
+					else{
+						cerr << "Error: Invalid operands for opcode" << endl;
+						return -1;
+					}
+				}
+			}
+			//type 2 or 4: operand 0 is register
+			else{
+				//type 4: SD and cond. jumps (register, number)
+				if(opr[1] >= 0){
+					if(validopt(opval, 4)){
+						return 4;
+					}
+					else{
+						cerr << "Error: Invalid operands for opcode" << endl;
+						return -1;	
+					}
+				}
+				//type 2: register, register: LD, SD
+				else{
+					//if(opr[1] < 0){
+					
+						if(validopt(opval, 2)){
+							return 2;
+						}
+						else{
+							cerr << "Error: Invalid operands for opcode" << endl;
+							return -1;
+						}
+					//}
+				}
+			}
+		//three arguments: All ALU and ALUi
+		//type 5 or 6: register, register/number, register
+		case 3:
+			//type 5: register, register, register
+			if(opr[0] < 0 && opr[1] < 0 && opr[2] < 0){
+				if(validopt(opval, 5)){
+					return 5;
+				}
+				else{
+					cerr << "Error: Invalid operands for opcode" << endl;
+					return -1;
+				}
+			}
+			//type 6: reg, num, reg
+			if(opr[0] < 0 && opr[1] >= 0 && opr[2] < 0){
+				if(validopt(opval, 6)){
+					return 6;
+				}
+				else{
+					cerr << "Error: Invalid operands for opcode" << endl;
+					return -1;
+				}
+			}
+			else{
+				cerr << "Error: REALLY Invalid operands for opcode" << endl;
+				return -1;
+			}
+			
+		default:
+			cerr << "Error: This should probably never occur" << endl;
+			return -1;
+	}
 	
+	/*
+	//Register as operand 1
+	if(opr[0] < 0){
+		//Register as operand 1,2
+		if(opr[1] < 0){
+			//Register as operand 1,2,3
+			if(opr[2] < 0 && oprind == 2 && validopt(opval, 5)){
+				return 5;
+			}
+			//Register as operand 1,2
+			else if(oprind == 1 && validopt(opval, 2)){
+				return 2;
+			}
+			//Register as operands 1,2; number as 3
+			else{
+				cerr << "Expected register or EOL on line: " << opdata->lnum << endl;
+				return -1;
+			}
+		}
+		//Register as opr1, number as opr2
+		else{
+			//Register as 3
+			if(opr[2] < 0 && oprind == 2 && validopt(opval, 6)){
+				return 6;
+			}
+			//1,2
+			else if(oprind == 1 && validopt(opval, 4)){
+				return 4;
+			}
+			//register, number, number
+			else{
+				cerr << "Expected register or EOL on line: " << opdata->lnum << endl;
+				return -1;
+			}
+		}
+				
+	}
+	//number as opr1
+	else{	
+	}*/
 	
 	cerr << "Invalid operands given" << endl;
 	return -1;
+}
+
+bool validopt(int opval, int optype){
+	//unfortunately have to go the long way for proper errors
+	//cout << "Called with opval: " << opval << " checking for optype: " << optype << endl; 
+	switch(opval){
+		case 1:
+		
+			if(optype == 1 || optype == 2){
+				return true;
+			}
+			else{
+				cerr << "Error: Expected <location, register> or <register, register> for LD" << endl;
+				return false;
+			}
+		case 2:
+			if(optype == 2 || optype == 4){
+				return true;
+			}
+			else{
+				cerr << "Error: Expected <register, register> or <register, location> for SD" << endl;
+				return false;
+			}
+		//ADD, SUB, MUL, DIV all have same format of 3 reg
+		case 3:
+		case 4:
+		case 5:
+		case 6:
+			if(optype == 5){
+				//cout << "XCalled with " << opval << " " << optype << endl;
+				return true;
+			}
+			else{
+				//cout << "Called with " << opval << " " << optype << endl;
+				cerr << "Error: Expected <register, register, register> for ALU opcode" << endl;
+				return false;
+			}
+		case 7:
+			if(optype == 7){
+				return true;
+			}
+			else{
+				cerr << "Error: Expected <location> for JMP" << endl;
+				return false;
+			}
+		//JZ, JNZ, JGZ, JGEZ, JLZ, JLEZ all get covered here
+		case 8:
+		case 9:
+		case 10:
+		case 11:
+		case 12:
+		case 13:
+			if(optype == 4){
+				return true;
+			}
+			else{
+				cerr << "Error: Expected <register, location> for conditional jump opcode" << endl;
+			}
+		case 100:
+			if(optype == 1){
+				return true;
+			}
+			else{
+				cerr << "Error: Expected <location, register> for LDi" << endl;
+				return false;
+			}
+		case 200:
+			if(optype == 1 || optype == 3){
+				return true;
+			}
+			else{
+				cerr << "Error: Expected <number, register> or <number, location> for SDi" << endl;
+			}
+		case 300:
+		case 400:
+		case 500:
+		case 600:
+			if(optype == 6){
+				return true;
+			}
+			else{
+				cerr << "Error: Expected <register, number, register> for ALUi" << endl;
+				return false;
+			}
+		default:
+			cerr << "Invalid opcode value invoked" << endl;
+			return false;
+	}
 }
 
 //Finds a single operand (Register or number)
@@ -572,14 +855,16 @@ int giveoperand(char segm[]){
 	//Need to check for two digits first, since a valid two digit is a valid one digit
 	if(segm[0] == 'R' && numchar(segm[1]) && numchar(segm[2])){
 		regval = 10*(segm[1]-'0')+(segm[2]-'0');
-		cout << "Found register__: " << regval << endl; 
-		return regval*-1;
+		regval *= -1;
+		//cout << "Found register__: " << regval << endl; 
+		return regval;
 	}
 	//2 digit register
 	else if(segm[0] == 'R' && numchar(segm[1])){
 		regval = int(segm[1]-'0');
+		regval *= -1;
 		//cout << "Found register_: " << regval << endl; 
-		return regval*-1;
+		return regval;
 	}
 	
 	//Number operand
@@ -594,7 +879,7 @@ int giveoperand(char segm[]){
 			ind++;
 		}
 		else{
-			cerr << "Error: Invalid character for numerical operand" << endl;
+			cerr << "Error: Invalid character for numerical operand (giveoperand)" << endl;
 			return -1000;
 		}
 	}
@@ -683,12 +968,15 @@ int wordcmp(char str1[], char str2[]){
 		return -1;
 	}
 }
+
+void dispStats(opline* opdata[]);
+
 /* √Can reprocess code into pure 2d array with multiple filters
  * √Commented line, whitespace line, etc
  * √Then for remaining lines strip out comments and leading/trailing whitespace
  * √Find code labels and get their addresses
- * Find opcodes and and their operands
- * Store it all in a nice clean struct array
+ * √Find opcodes and and their operands
+ * √Store it all in a nice clean struct array
  * Do the statistical analysis on number of each type
  * 
  * Keep track of:
@@ -715,10 +1003,10 @@ int wordcmp(char str1[], char str2[]){
  * weird requirement: case insensitive
  * opcodes:
  * 		√need to figure out what the opcode is and store that
- * 		need to figure out operands and store them
- * 			check validity too
- * 			first find out what OpType is happening and store that
- * 			then find the actual number / register values and store those
+ * 		√need to figure out operands and store them
+ * 			mostly√check validity too
+ * 			√first find out what OpType is happening and store that
+ * 			√then find the actual number / register values and store those
  * 		√need to get current line number and store that with opdata
  * 
  * rest:
