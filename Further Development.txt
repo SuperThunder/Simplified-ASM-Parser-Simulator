@@ -1,0 +1,11 @@
+Test cases:
+Same label appears twice
+Jump to valid label
+	need to have index of label numbers
+	or replace labels with numbers
+Jump to invalid label
+Assembly execution starts from code label
+File doesn't exist/can't open
+
+
+More code than space for code (code overflows label)

@@ -553,7 +553,7 @@ int giveopval(char opcode[], int oplen){
 //				- that needs to be checked
 //Opval -> possible operands -> error or return Optype
 int giveoptype(char operands[], int opval, opline* opdata){
-	int retcode, comloc;
+	int retcode;
 	int ind = 0, curopind = 0, oprind = 0;
 	int opr[3];
 	char curop[11];
@@ -561,9 +561,8 @@ int giveoptype(char operands[], int opval, opline* opdata){
 	
 	//get the optype by checking each operand
 	//while(operands[ind] != 0 && operands[ind] != '\n'){
-		//cout << operands[ind] << " ";
-	//Strong suspicion this func isn't being passed a NUL at the end
-	for(int ind = 0; operands[ind] != '\0'; ind++){
+	//cout << operands[ind] << " ";
+	for(ind = 0; operands[ind] != '\0'; ind++){
 		
 		if(operands[ind] == ',' || operands[ind] == '\0' || operands[ind] == '\n'){
 			//cout << "Encountered: " << int(operands[ind]) << endl;
@@ -605,7 +604,11 @@ int giveoptype(char operands[], int opval, opline* opdata){
 			opdata->opd1 = opr[0]; 
 			break;
 		default:
-			cerr << "How did the opr ind even get here?";
+			//It can get here with too many inputs!
+			cerr << "Error: Too many operands on line " << opdata->lnum\
+			 << ": " << (operands);
+			return -1;
+			//cerr << "How did the opr ind even get here?";
 	}
 	
 	//GIANT SWITCHES/IFS HERE TO DETERMINE OPTYPE BY OPERANDS
@@ -629,8 +632,14 @@ int giveoptype(char operands[], int opval, opline* opdata){
 		//type 1, 2, 3, or 4
 		case 2:
 			//type 1 or 3: operand 0 is numerical
-			if(opr[0] >= 0){
-				//type 3: SDi: operand 1 numerical
+			//Type 3: SDi: Operand 1 CAN be a negative number
+			//Which really messes things up since we reserved those for ints
+			//special check for SDi with negative
+			if(opr[0] < 0 && opval == 200 && opr[1] > 0){
+				return 3;
+			}
+			else if(opr[0] >= 0){
+				//type 3: SDi: operand 1 numerical->ONLY POSITIVE HERE
 				if(opr[1] >= 0){
 					//cout << "Triggering for: " << opr[1] << endl;
 					if(validopt(opval, 3)){
@@ -641,7 +650,7 @@ int giveoptype(char operands[], int opval, opline* opdata){
 						return -1;
 					}
 				}
-				//type 1: LD, LDi, SDi: operand 1 is register
+				//type 1: LD, LDi, <\SDi>: operand 1 is register
 				else{ //operand 1 is register
 					//cout << "Register: " << opr[1] << endl;
 					if(validopt(opval, 1)){
@@ -878,6 +887,10 @@ int giveoperand(char segm[]){
 			num[ind] = segm[ind];
 			ind++;
 		}
+		else if(segm[ind] == '-' && ind == 0){
+			num[ind] = segm[ind];
+			ind++;
+		}
 		else{
 			cerr << "Error: Invalid character for numerical operand (giveoperand)" << endl;
 			return -1000;
@@ -885,6 +898,7 @@ int giveoperand(char segm[]){
 	}
 	num[ind] = '\0';
 	//cout << "Found number: " << atoi(num) << endl;
+	//so since we used atoi, it seems like negative numbers have been handled
 	return atoi(num);
 	
 	cerr << "How did this even happen?" << endl;
@@ -947,7 +961,6 @@ bool alphachar(char in){
 	}
 }
 
-
 int wordcmp(char str1[], char str2[]){
 	//cout << "SEGSEGSEG" << endl;	
 	//cout << str1[0] << "\t" << str2[0] << endl;
@@ -969,7 +982,18 @@ int wordcmp(char str1[], char str2[]){
 	}
 }
 
-void dispStats(opline* opdata[]);
+int labelPreparse(labeldata* labels[]){
+}
+
+//Returns the program line of a label
+int labelLookup(char label, labeldata* labels[]){
+		
+}
+
+//Prints out the stats about the program
+void dispStats(opline* opdata[]){
+	
+}
 
 /* √Can reprocess code into pure 2d array with multiple filters
  * √Commented line, whitespace line, etc
