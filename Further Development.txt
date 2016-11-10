@@ -1,10 +1,11 @@
 Test cases:
 Same label appears twice
 Jump to valid label
-	need to have index of label numbers
+	need to have index of label line numbers
 	or replace labels with numbers
+	preparse file to find all labels, then replace labels with 		line numbers
 Jump to invalid label
-Assembly execution starts from code label
+Assembly execution starts from code label without number
 File doesn't exist/can't open
 
 

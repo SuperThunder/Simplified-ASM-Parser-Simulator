@@ -23,7 +23,7 @@ struct opline{
 	int opd1; //See included text file
 	int opd2;
 	int opd3;
-	int oplen;
+	int oplen; //character length of the operand (used for sending operands)
 	int optype; //the type (1 to 7) of operands the opcode has
 	int lnum; //line number of command
 };
@@ -65,15 +65,15 @@ int main(int argc, char* argv[]){
 		cerr << "Invalid input" << endl;
 		return -1;
 	}
-
+	
+	//Once this simulator is FULLY OPERATIONAL
+	//We'll probably want to move all the file/parse stuff to a new function
 	ifstream asmin;
 	asmin.open(argv[1]);
 	
 	numlines1 = fillfilelines(filelines, asmin);
 	numlines2 = removecruft(filelines, codelines, numlines1);
-	
-	//Once this simulator is FULLY OPERATIONAL
-	//We'll probably want to move all the file/parse stuff to a new function
+
 	cout << "With cruft removed: " << numlines2 << " lines" << endl;
 	
 	for(int i = 0; i < numlines2; i++){
@@ -155,7 +155,6 @@ int main(int argc, char* argv[]){
 			prevlabelline = labelline;
 		
 	}
-	
 	
 	return 0;
 }

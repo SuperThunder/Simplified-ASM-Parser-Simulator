@@ -51,6 +51,9 @@ Type 5: Ri, Rj, Rk: 	3, 4, 5, 6
 Type 6: Ri, nnnn, Rk: 	300, 400, 500, 600
 Type 7: nnnn		7
 
+NOTE: For any nnnn for a jump command, the number may not be explicitly declared but given as a [labelname]
+ex: JMP endofloop
+
 -----------------
 REGISTERS
 -----------------
