@@ -363,7 +363,7 @@ bool checkopcode(char* line, opline* opdata){
 		//and a string tokenizer/splitter
 		for(int ind = 0; ind < 5; ind++){
 			if(line[ind] == '\0' || opcodes4[op][ind] == '\0'){
-				return false;
+				//return false; //probably ended up here from early development, quite the bug
 				break;
 			}
 			//if we get a non matching char
@@ -375,6 +375,7 @@ bool checkopcode(char* line, opline* opdata){
 		//if the opcode is still a match
 		if(opmatch){
 			oplen = 4;
+			cout << "Matching 4 char opcode: " << endl;
 			//get and set the opcode value
 			opcval = giveopval(opcodes4[op], oplen);
 			opdata->opc = opcval;
@@ -465,6 +466,7 @@ bool toupper (char line[]){
 
 //Return the numerical value of an opcode
 int giveopval(char opcode[], int oplen){
+	cout << "giveopval sent oplen: " << oplen << endl;
 	switch(oplen){
 		case 4:
 			if(cmpop(opcode, "ADDI")){
@@ -843,6 +845,7 @@ bool validopt(int opval, int optype){
 		case 400:
 		case 500:
 		case 600:
+			//cout << "ALUi called" << endl;
 			if(optype == 6){
 				return true;
 			}
@@ -996,9 +999,6 @@ int labelLookup(char label, labeldata* labels[]){
 void dispStats(opline opdata[], int opcount){
 	int aluc = 0, cmpjmpc = 0, ldsdc = 0;
 	int curopval;
-	//char ldsdarr[4][4]{"LD", "LDi", "SD", "SDi"};
-	//char aluarr[8][5]{"ADD", "ADDi", "SUB", "SUBi", "MUL", "MULi", "DIV", "DIVi"};
-	//char cmpjmparr[7][5]{"JMP", "JZ", "JNZ", "JGZ", "JGEZ", "JLZ", "JLEZ"};
 	
 	//for each opcode we have recorded
 	for(int i=0; i < opcount; i++){
@@ -1007,31 +1007,23 @@ void dispStats(opline opdata[], int opcount){
 		if(curopval==1 || curopval==2 || curopval==100 || curopval==200){
 			ldsdc++;
 		}
-		else if((curopval >= 3 && curopval <= 6) || (curopval>=200&&curopval<=600)){
+		else if((curopval >= 3 && curopval <= 6) || (curopval>=300&&curopval<=600)){
+			//cout << "aluc++";
 			aluc++;
 		}
 		else if((curopval >= 7 && curopval <= 13)){
 			cmpjmpc++;
 		}
 		else{
-			cout << "Invalid opcode " << curopval << endl;
+			cout << "Invalid opcode found during counting" << curopval << endl;
 		}
-				/*for(int k = 0; k < 4; k++){
-			if(cmpop(opdata[i].opc, ldsdarr[k])){
-				ldsdc += 1;
-			}
-		}
-		for(int k = 0; k < 8; k++){
-			if(cmpop(opdata[i].opc, aluarrarr[k])){
-				aluc += 1;
-			}
-		}
-		for(int k = 0; k < 7; k++){
-			if(cmpop(opdata[i].opc, cmpjmparr[k])){
-				cmpjmpc += 1;
-			}
-		}*/
+		
 	}
+	
+	cout << "Total number of assembly instructions: " << aluc+cmpjmpc+ldsdc << endl;
+	cout << "Number of Load/Store: " << ldsdc << endl;
+	cout << "Number of ALU: " << aluc << endl;
+	cout << "Number of Compare/Jump: " << cmpjmpc << endl;
 	 
 }
 
