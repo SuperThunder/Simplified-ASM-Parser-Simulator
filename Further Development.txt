@@ -1,3 +1,5 @@
+File doesn't exist/can't open (really should handle this properly)
+
 Test cases:
 Same label appears twice
 Jump to valid label
@@ -6,7 +8,7 @@ Jump to valid label
 	preparse file to find all labels, then replace labels with 		line numbers
 Jump to invalid label
 Assembly execution starts from code label without number
-File doesn't exist/can't open
+
 
 
 More code than space for code (code overflows label)

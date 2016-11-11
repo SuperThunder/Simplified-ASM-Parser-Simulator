@@ -1,4 +1,4 @@
-To not have to be constantly comparing strings, the opcodes and operands are mapped to an integer value as below. 
+To avoid constantly comparing strings, the opcodes and operands are mapped to an integer value as below. 
 Any nnnn operand value (memory location or integer value) is stored as is. Register operands are stored as negative nnnns, as there is no case where a negative number would be passed otherwise.
 -----------------
 OPCODES

@@ -48,7 +48,7 @@ bool cmpop(char op1[], char op2[]);
 //bool alphanumpunc(char in);
 bool numchar(char in);
 int wordcmp(char str1[], char str2[]);
-void dispStats(opline* opdata[]);
+void dispStats(opline opdata[], int opcount);
 
 int main(int argc, char* argv[]){
 	char filelines[1000][255];
@@ -56,7 +56,7 @@ int main(int argc, char* argv[]){
 	char labeltemp[NUM_COLS];
 	opline allopcodes[1000];
 	labeldata labels[250];
-	int numlines1, numlines2; //Number of lines at each stage
+	int numlines1, numlines2, totalopcodes; //Number of lines at each stage
 	int labelline, prevlabelline;
 	int labellineoffset = 0, curopnum = 0, labelind = 0;
 	
@@ -155,6 +155,9 @@ int main(int argc, char* argv[]){
 			prevlabelline = labelline;
 		
 	}
+	
+	totalopcodes = curopnum; //need this to know how long opcode array is
+	dispStats(allopcodes, totalopcodes);
 	
 	return 0;
 }
@@ -990,8 +993,46 @@ int labelLookup(char label, labeldata* labels[]){
 }
 
 //Prints out the stats about the program
-void dispStats(opline* opdata[]){
+void dispStats(opline opdata[], int opcount){
+	int aluc = 0, cmpjmpc = 0, ldsdc = 0;
+	int curopval;
+	//char ldsdarr[4][4]{"LD", "LDi", "SD", "SDi"};
+	//char aluarr[8][5]{"ADD", "ADDi", "SUB", "SUBi", "MUL", "MULi", "DIV", "DIVi"};
+	//char cmpjmparr[7][5]{"JMP", "JZ", "JNZ", "JGZ", "JGEZ", "JLZ", "JLEZ"};
 	
+	//for each opcode we have recorded
+	for(int i=0; i < opcount; i++){
+		cout << "Opcode: " << opdata[i].opc << endl;
+		curopval = opdata[i].opc;
+		if(curopval==1 || curopval==2 || curopval==100 || curopval==200){
+			ldsdc++;
+		}
+		else if((curopval >= 3 && curopval <= 6) || (curopval>=200&&curopval<=600)){
+			aluc++;
+		}
+		else if((curopval >= 7 && curopval <= 13)){
+			cmpjmpc++;
+		}
+		else{
+			cout << "Invalid opcode " << curopval << endl;
+		}
+				/*for(int k = 0; k < 4; k++){
+			if(cmpop(opdata[i].opc, ldsdarr[k])){
+				ldsdc += 1;
+			}
+		}
+		for(int k = 0; k < 8; k++){
+			if(cmpop(opdata[i].opc, aluarrarr[k])){
+				aluc += 1;
+			}
+		}
+		for(int k = 0; k < 7; k++){
+			if(cmpop(opdata[i].opc, cmpjmparr[k])){
+				cmpjmpc += 1;
+			}
+		}*/
+	}
+	 
 }
 
 /* √Can reprocess code into pure 2d array with multiple filters
