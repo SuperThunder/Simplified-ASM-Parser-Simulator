@@ -130,6 +130,7 @@ int main(int argc, char* argv[]){
 					//we don't reset the line offset for data, because it doesn't refer to code
 					cout << "Found Data label with value: " << labelline << endl;
 					labelind += 1;
+					labelline = prevlabelline;
 				}
 			}
 			else{
