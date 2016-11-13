@@ -1,5 +1,8 @@
 Test cases:
 Wants error and FILE line number
+Wants values of code and data directives, as well as names and values of any labels
+Need special cases for code/data labels
+Error of no code label at start, or code with no line
 Same label appears twice
 Jump to valid label
 	need to have index of label line numbers

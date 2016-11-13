@@ -59,6 +59,7 @@ int main(int argc, char* argv[]){
 	int numlines1, numlines2, totalopcodes; //Number of lines at each stage
 	int labelline, prevlabelline;
 	int labellineoffset = 0, curopnum = 0, labelind = 0;
+	bool foundcode = false, founddata = false;
 	
 	//First argument that is filename, next is actual input
 	if(argc < 2){
@@ -105,10 +106,38 @@ int main(int argc, char* argv[]){
 		//cout << "Label: " << labelline << "Prevlabel: " << prevlabelline << endl;
 		labelline = findlabel(codelines[i], labeltemp, &labels[labelind]);
 		if(labelline >= 0){
-			cout << "Now in label " << labeltemp << " at " << labelline << endl;
-			//cout << "Now in label " << labels[labelind].label << " at " << labels[labelind].line << endl;
-			labellineoffset = 0; //reset the offset if we're in a new label
-			labelind += 1;
+			//check if we got the code label
+			if(wordcmp("CODE", labels[labelind].label) == 0){
+			//handles special case of code label being found
+				if(foundcode){
+					cerr << "Error: Code label redeclared on line " << i <<\
+					" with value " << labelline << endl;
+					 return -1;
+				}
+				else{
+					cout << "Found Code label with value: " << labelline << endl;
+					labellineoffset = 0; //reset the offset if we're in a new label
+					labelind += 1;
+				}
+			}
+			else if(wordcmp("DATA", labels[labelind].label) == 0){
+				//if it was already found
+				if(founddata){
+					cerr << "Error: Redeclaration of Data label on line: " << i << endl;
+					return -1;
+				}
+				else{
+					//we don't reset the line offset for data, because it doesn't refer to code
+					cout << "Found Data label with value: " << labelline << endl;
+					labelind += 1;
+				}
+			}
+			else{
+				cout << "Now in label " << labeltemp << " at " << labelline << endl;
+				//cout << "Now in label " << labels[labelind].label << " at " << labels[labelind].line << endl;
+				labellineoffset = 0; //reset the offset if we're in a new label
+				labelind += 1;
+			}
 		}
 		else if(labelline == -1){
 			//Just means there wasn't a label, check for opcode
@@ -126,7 +155,7 @@ int main(int argc, char* argv[]){
 				(codelines[i]+allopcodes[curopnum].oplen), allopcodes[curopnum].opc,\
 				&allopcodes[curopnum]);
 				
-				cout << "Found new opcode " << allopcodes[curopnum].opc;
+				cout << i << ": Found new opcode " << allopcodes[curopnum].opc;
 				cout << " on line: " << allopcodes[curopnum].lnum;
 				cout << " with type: " << allopcodes[curopnum].optype << endl;
 				//cout << " with length: " << allopcodes[curopnum].oplen << endl;
@@ -155,9 +184,13 @@ int main(int argc, char* argv[]){
 			labelind += 1;
 			
 		}
+		else if(labelline == -3){
+		}
+		else if(labelline == -4){
+		}
 		else{
 			//Should be only triggered by error
-			cerr << "Invalid code in file, program exiting" << endl;
+			cerr << "Invalid on line " << i << " , program exiting" << endl; 
 			return -1;
 		}
 			//cout << prevlabelline << " = " << labelline;
@@ -267,7 +300,7 @@ int findlabel(char line[], char label[], labeldata* labelstruct){
 	
 	//Check that first char is OK
 	if(!alphachar(line[0])){
-		cout << "Invalid line starting character: " << line[0] << endl;
+		cout << "Invalid label starting character: " << line[0] << endl;
 		return -100;
 	}
 	
