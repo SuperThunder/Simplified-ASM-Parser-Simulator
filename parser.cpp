@@ -33,7 +33,7 @@ struct labeldata{
 	int line;
 };
 
-int fillfilelines(char filelines[][255], ifstream& asmin);
+int fillfilelines(char filelines[][NUM_COLS], ifstream& asmin);
 int removecruft(char filelines[][NUM_COLS], char dest[][NUM_COLS], int numlines);
 int findlabel(char line[], char label[], labeldata* labelstruct);
 int giveopval(char opcode[], int oplen);
@@ -74,6 +74,11 @@ int main(int argc, char* argv[]){
 	//We'll probably want to move all the file/parse stuff to a new function
 	ifstream asmin;
 	asmin.open(argv[1]);
+	
+	if(asmin.fail()){
+		cerr << "Error: Invalid filename" << endl;
+		return -1;
+	}
 	
 	numlines1 = fillfilelines(filelines, asmin);
 	numlines2 = removecruft(filelines, codelines, numlines1);
@@ -470,7 +475,7 @@ bool toupper (char line[]){
 
 //Return the numerical value of an opcode
 int giveopval(char opcode[], int oplen){
-	cout << "giveopval sent oplen: " << oplen << endl;
+	//cout << "giveopval sent oplen: " << oplen << endl;
 	switch(oplen){
 		case 4:
 			if(cmpop(opcode, "ADDI")){
@@ -886,7 +891,7 @@ int giveoperand(char segm[]){
 	}
 	
 	//Number operand
-	//If we get a none numerical character here
+	//If we get a non numerical character here
 	//There is no valid operand
 	int ind = 0;
 	char num[20];
@@ -991,7 +996,19 @@ int wordcmp(char str1[], char str2[]){
 	}
 }
 
-int labelPreparse(labeldata* labels[]){
+//Checks all the labels
+//Error on ind repeats, invalid names, pointing to the same line
+//Fill in line numbers of labels for the jmp commands
+int preparse(char* filelines[]){
+	//first task: find every instance of a label; figure out the line number
+	
+	
+	//second task: check for duplicates, labels on adjacent lines
+	
+	
+	//third task: replace every label that is given to a jump with its line number
+	
+	
 }
 
 //Returns the program line of a label

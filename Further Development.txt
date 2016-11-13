@@ -1,14 +1,23 @@
-File doesn't exist/can't open (really should handle this properly)
-
 Test cases:
+Wants error and FILE line number
 Same label appears twice
 Jump to valid label
 	need to have index of label line numbers
 	or replace labels with numbers
-	preparse file to find all labels, then replace labels with 		line numbers
+	preparse file to find all labels, then replace labels with line numbers
+Handle special case of DATA label
 Jump to invalid label
-Assembly execution starts from code label without number
+Assembly execution starts from code label without number (no base reference - invalid?)
 
 
 
 More code than space for code (code overflows label)
+
+If program was to be rewritten (because parser2 is a mess):
+	Parse all the file lines into a special struct array type
+	Array would have a type variable, that could specify pretty much everything -> could be an enum
+	Comment line would have value, label line would have value
+	Every permutation of what's generically in a line could have a value
+	Or, more simply, it would just be a few values of COMMENT, WHITESPACE, LABEL, or OPCODE
+	The generic linestruct would have a type int/enum, a file line number, an asm line number, a char array for the whole line, 3 char arrays for each operand, 3 ints for operands, and a pointer to the next line's linestruct
+
