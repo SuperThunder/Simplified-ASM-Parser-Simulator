@@ -1,14 +1,11 @@
 Test cases:
-Wants error and FILE line number->Turns out WS and comment lines DO matter->We will replace them with special IGNORE ME I'M SPECIAL LINES
-Wants values of code and data directives, as well as names and values of any labels
-Need special cases for code/data labels
-Error of no code label at start, or code with no line
+
 Same label appears twice
 Jump to valid label
 	need to have index of label line numbers
 	or replace labels with numbers
 	preparse file to find all labels, then replace labels with line numbers
-Handle special case of DATA label
+
 Jump to invalid label
 Assembly execution starts from code label without number (no base reference - invalid?)
 

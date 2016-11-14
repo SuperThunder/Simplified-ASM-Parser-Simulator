@@ -49,9 +49,10 @@ bool cmpop(char op1[], char op2[]);
 bool numchar(char in);
 int wordcmp(char str1[], char str2[]);
 int nocasewordcmp(char str1[], char str2[]);
+int labelLookup(char label, labeldata* labels[], int len);
 void dispStats(opline opdata[], int opcount);
 
-//global variable for current file line
+//global variable for current file line; forgive me
 int curfl = 0;
 
 int main(int argc, char* argv[]){
@@ -64,7 +65,7 @@ int main(int argc, char* argv[]){
 	int numlines1, numlines2, totalopcodes; //Number of lines at each stage
 	int labelline, prevlabelline;
 	int labellineoffset = 0, curopnum = 0, labelind = 0;
-	bool foundcode = false, founddata = false;
+	bool foundcode = false, founddata = false, prevwaslabel;
 	
 	//First argument that is filename, next is actual input
 	if(argc < 2){
@@ -99,30 +100,38 @@ int main(int argc, char* argv[]){
 	//cout << "With unnecessary cases changed: " << endl;
 	for(int i = 0; i < numlines2; i++){
 		toupper(codelines[i], ucodelines[i]);
-		cerr << ucodelines[i];
+		//cerr << ucodelines[i];
 	}
 	
 	
 	//Get labels, opcodes, and operands
 	for(int i = 0; i < numlines2; i++){
-		curfl = i;
+		curfl = i+1; //i is 0 indexed, the file line is 1 indexed
 		//First, check for a label
 		//labelline finds the line of the label, and stores them in the labels struct array
 
 		//cout << "Label: " << labelline << "Prevlabel: " << prevlabelline << endl;
+		//Have this to deal with unused lines
+		if(codelines[i][0] == '#'){
+			//cout << "Skipping non code line" << i << endl;
+			continue;
+		}
+		
+		cout << curfl << "\t";
+		
 		labelline = findlabel(codelines[i], labeltemp, &labels[labelind]);
 		if(labelline >= 0){
 			//check if we got the code label
 			if(nocasewordcmp("CODE", labels[labelind].label) == 0){
 			//handles special case of code label being found
 				if(foundcode){
-					cerr << "Error: Code label duplicated on line " << i <<\
-					" with value " << labelline << endl;
+					cerr << "Error on line " << curfl <<  " duplicated Code label with value " << labelline << endl;
 					 return -1;
 				}
 				else{
 					foundcode = true;
-					cout << "Code:" << labelline << endl;
+					prevwaslabel = true;
+					cout << "Code: " << labelline << endl;
 					labellineoffset = 0; //reset the offset if we're in a new label
 					labelind += 1;
 				}
@@ -130,19 +139,20 @@ int main(int argc, char* argv[]){
 			else if(nocasewordcmp("DATA", labels[labelind].label) == 0){
 				//if it was already found
 				if(founddata){
-					cerr << "Error: Duplicated of Data label on line: " << i << endl;
+					cerr << "Error on line " << curfl << " duplicated Data label" << endl;
 					return -1;
 				}
 				else{
 					founddata = true;
+					prevwaslabel = true;
 					//we don't reset the line offset for data, because it doesn't refer to code
-					cout << "Data:" << labelline << endl;
+					cout << "Data: " << labelline << endl;
 					labelind += 1;
 					labelline = prevlabelline; //do this as well since DATA label doesn't affect the code
 				}
 			}
 			else{
-				cout << labeltemp << ":" << labelline << i << endl;
+				cout << labeltemp << ": " << labelline << i << endl;
 				//cout << "Now in label " << labels[labelind].label << " at " << labels[labelind].line << endl;
 				labellineoffset = 0; //reset the offset if we're in a new label
 				labelind += 1;
@@ -159,6 +169,7 @@ int main(int argc, char* argv[]){
 				//cout << "Calling giveoptype with: " << codelines[i]+allopcodes[curopnum].oplen << endl;
 				//cout << "\t" << allopcodes[curopnum].opc;
 				//cout << "\t" << allopcodes[curopnum].lnum << endl;
+				prevwaslabel = false;
 				allopcodes[curopnum].lnum = prevlabelline + 1;
 				allopcodes[curopnum].optype = giveoptype(\
 				(codelines[i]+allopcodes[curopnum].oplen), allopcodes[curopnum].opc,\
@@ -185,11 +196,16 @@ int main(int argc, char* argv[]){
 			//We found a label, but it didn't have a specific line
 			//Work off the distance from the known label line
 			//This does rely on people AT LEAST giving the code label a line
-			labellineoffset += 0; //ASSUMING NEW LABEL DOESN't CHANGE ADDRESS
+			labellineoffset += 0; //ASSUMING NEW LABEL DOESN'T CHANGE ADDRESS
 			labelline = prevlabelline + 0;
-			labels[labelind].line = prevlabelline + 1;
+			//if the previous was label, don't give this label new line
+			labels[labelind].line = prevlabelline+0;
+			//this may or may not apply, spec unclear
+			if(!prevwaslabel){
+				//labels[labelind].line++;
+			}
 			//cout << "Now in label " << labeltemp << " at " << labelline << endl;
-			cout << labels[labelind].label << ":" << labels[labelind].line << endl;
+			cout << labels[labelind].label << ": " << labels[labelind].line << endl;
 			//<< " from line " << i << endl;
 			labelind += 1;
 			
@@ -200,7 +216,7 @@ int main(int argc, char* argv[]){
 		}
 		else{
 			//Should be only triggered by error
-			cerr << "Error on line " << i << " , program exiting" << endl; 
+			cerr << "Error on line " << curfl << " , program exiting" << endl; 
 			return -1;
 		}
 			//cout << prevlabelline << " = " << labelline;
@@ -245,7 +261,7 @@ int fillfilelines(char filelines[][255], ifstream& asmin){
 	return line;
 }
 
-//Remove comments and whitespace
+//Remove comments and whitespace, replaces them with sentinel
 //Returns number of lines in cleaned up array
 int removecruft(char filelines[][NUM_COLS], char dest[][NUM_COLS], int numlines){
 	int line = 0;
@@ -292,6 +308,13 @@ int removecruft(char filelines[][NUM_COLS], char dest[][NUM_COLS], int numlines)
 			}
 		}
 		if(charadded){
+			line++;
+		}
+		else{
+			//set sentinel for unused line, needed to count file lines
+			dest[line][0] = '#';
+			dest[line][1] = '\n';
+			dest[line][2] = '\0';
 			line++;
 		}
 		
@@ -503,7 +526,7 @@ bool checkopcode(char* line, opline* opdata){
 		}
 	}	
 	
-	cerr << "Error on line " << curfl << "parsing opcode and operands" << endl;
+	cerr << "Error on line " << curfl << " parsing opcode and operand" << endl;
 	return false;
 }
 
@@ -643,7 +666,7 @@ int giveoptype(char operands[], int opval, opline* opdata){
 			retcode = giveoperand(curop);
 			//cout << "Was returned: " << retcode << endl;
 			if(retcode == -1000){
-				cerr << "Error: Invalid operands" << endl;
+				cerr << "Error on line " << curfl << " invalid operands" << endl;
 				return -1;
 			}
 			//cout << "Returned: " << retcode << endl;
@@ -677,7 +700,7 @@ int giveoptype(char operands[], int opval, opline* opdata){
 			break;
 		default:
 			//It can get here with too many inputs!
-			cerr << "Error: Too many extra operands on line " << curfl\
+			cerr << "Error on line " << curfl << " extra operands"\
 			<< "at address: " << opdata->lnum << ": " << (operands);
 			return -1;
 			//cerr << "How did the opr ind even get here?";
@@ -697,7 +720,8 @@ int giveoptype(char operands[], int opval, opline* opdata){
 				return 7;
 			}
 			else{
-				cerr << "Error: Invalid operands for opcode";
+				cerr << "Error on line " << curfl << " invalid operands for opcode"\
+				<< " maybe missing, duplicated, or invalid" << endl;
 				return -1;
 			}
 		//two arguments: LDx2, LDi, SDix2, SDx2, all the cond. jumps
@@ -718,7 +742,7 @@ int giveoptype(char operands[], int opval, opline* opdata){
 						return 3;
 					}
 					else{
-						cerr << "Error: Invalid operands for opcode" << endl;
+						cerr << "Error on line " << curfl << " invalid operands for opcode" << endl;
 						return -1;
 					}
 				}
@@ -729,7 +753,7 @@ int giveoptype(char operands[], int opval, opline* opdata){
 						return 1;
 					}
 					else{
-						cerr << "Error: Invalid operands for opcode" << endl;
+						cerr << "Error on line" << curfl << " invalid operands for opcode" << endl;
 						return -1;
 					}
 				}
@@ -742,7 +766,7 @@ int giveoptype(char operands[], int opval, opline* opdata){
 						return 4;
 					}
 					else{
-						cerr << "Error: Invalid operands for opcode" << endl;
+						cerr << "Error on line" << curfl << " invalid operands for opcode" << endl;
 						return -1;	
 					}
 				}
@@ -754,7 +778,7 @@ int giveoptype(char operands[], int opval, opline* opdata){
 							return 2;
 						}
 						else{
-							cerr << "Error: Invalid operands for opcode" << endl;
+							cerr << "Error on line" << curfl << " invalid operands for opcode" << endl;
 							return -1;
 						}
 					//}
@@ -769,8 +793,7 @@ int giveoptype(char operands[], int opval, opline* opdata){
 					return 5;
 				}
 				else{
-					cerr << "Error: invalid operands for opcode"\
-					<< "on line " << curfl << endl;
+					cerr << "Error on line " << curfl << " invalid operands for opcode" << endl;
 					return -1;
 				}
 			}
@@ -780,14 +803,13 @@ int giveoptype(char operands[], int opval, opline* opdata){
 					return 6;
 				}
 				else{
-					cerr << "Error: invalid operands for opcode"\
-					<< "on line " << curfl << endl;
+					cerr << "Error on line" << curfl << endl;
 					return -1;
 				}
 			}
 			else{
-				cerr << "Error: REALLY invalid operands for opcode"\
-				<< "on line " << curfl << endl;
+				cerr << "Error on line " << curfl << " REALLY invalid operands for opcode"\
+				<< " on line " << endl;
 				return -1;
 			}
 			
@@ -968,7 +990,7 @@ int giveoperand(char segm[]){
 			ind++;
 		}
 		else{
-			cerr << "Error: Invalid character for numerical operand (giveoperand)" << endl;
+			cerr << "Error on line " << curfl <<  " invalid character for numerical operand (giveoperand)" << endl;
 			return -1000;
 		}
 	}
@@ -1125,8 +1147,9 @@ int preparse(char* filelines[]){
 }
 
 //Returns the program line of a label
-int labelLookup(char label, labeldata* labels[]){
-		
+//Returns -1 if label DNE in array
+int labelLookup(char label, labeldata* labels[], int len){
+	
 }
 
 //Prints out the stats about the program
