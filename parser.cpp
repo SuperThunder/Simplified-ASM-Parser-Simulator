@@ -41,18 +41,23 @@ int giveoptype(char operands[], int opval, opline* opdata);
 int giveoperand(char segm[]);
 bool checkopcode(char line[], opline* opdata);
 bool validopt(int opval, int optype);
-bool toupper(char line[]);
+bool toupper(char srcline[], char destline[]);
 bool nonvischar(char in);
 bool alphachar(char in);
 bool cmpop(char op1[], char op2[]);
 //bool alphanumpunc(char in);
 bool numchar(char in);
 int wordcmp(char str1[], char str2[]);
+int nocasewordcmp(char str1[], char str2[]);
 void dispStats(opline opdata[], int opcount);
+
+//global variable for current file line
+int curfl = 0;
 
 int main(int argc, char* argv[]){
 	char filelines[1000][255];
 	char codelines[1000][255];
+	char ucodelines[1000][255];
 	char labeltemp[NUM_COLS];
 	opline allopcodes[1000];
 	labeldata labels[250];
@@ -93,13 +98,14 @@ int main(int argc, char* argv[]){
 	
 	cout << "With unnecessary cases changed: " << endl;
 	for(int i = 0; i < numlines2; i++){
-		toupper(codelines[i]);
-		cout << codelines[i];
+		toupper(codelines[i], ucodelines[i]);
+		cout << ucodelines[i];
 	}
 	
 	
 	//Get labels, opcodes, and operands
 	for(int i = 0; i < numlines2; i++){
+		curfl = i;
 		//First, check for a label
 		//labelline finds the line of the label, and stores them in the labels struct array
 
@@ -107,7 +113,7 @@ int main(int argc, char* argv[]){
 		labelline = findlabel(codelines[i], labeltemp, &labels[labelind]);
 		if(labelline >= 0){
 			//check if we got the code label
-			if(wordcmp("CODE", labels[labelind].label) == 0){
+			if(nocasewordcmp("CODE", labels[labelind].label) == 0){
 			//handles special case of code label being found
 				if(foundcode){
 					cerr << "Error: Code label redeclared on line " << i <<\
@@ -115,26 +121,31 @@ int main(int argc, char* argv[]){
 					 return -1;
 				}
 				else{
-					cout << "Found Code label with value: " << labelline << endl;
+					foundcode = true;
+					cout << "Found Code label with address: " << labelline\
+					<< " on line: " << i << endl;
 					labellineoffset = 0; //reset the offset if we're in a new label
 					labelind += 1;
 				}
 			}
-			else if(wordcmp("DATA", labels[labelind].label) == 0){
+			else if(nocasewordcmp("DATA", labels[labelind].label) == 0){
 				//if it was already found
 				if(founddata){
 					cerr << "Error: Redeclaration of Data label on line: " << i << endl;
 					return -1;
 				}
 				else{
+					founddata = true;
 					//we don't reset the line offset for data, because it doesn't refer to code
-					cout << "Found Data label with value: " << labelline << endl;
+					cout << "Found Data label with address: " << labelline\
+					<< " on line: " << i << endl;
 					labelind += 1;
-					labelline = prevlabelline;
+					labelline = prevlabelline; //do this as well since DATA label doesn't affect the code
 				}
 			}
 			else{
-				cout << "Now in label " << labeltemp << " at " << labelline << endl;
+				cout << labeltemp << ":" << labelline\
+				<< " from line " << i << endl;
 				//cout << "Now in label " << labels[labelind].label << " at " << labels[labelind].line << endl;
 				labellineoffset = 0; //reset the offset if we're in a new label
 				labelind += 1;
@@ -142,7 +153,7 @@ int main(int argc, char* argv[]){
 		}
 		else if(labelline == -1){
 			//Just means there wasn't a label, check for opcode
-			if(checkopcode(codelines[i], &allopcodes[curopnum])){
+			if(checkopcode(ucodelines[i], &allopcodes[curopnum])){
 				/*
 				cout << "Found new opcode " << allopcodes[curopnum].opc;
 				cout << " on line: " << prevlabelline+1 << endl;
@@ -156,8 +167,8 @@ int main(int argc, char* argv[]){
 				(codelines[i]+allopcodes[curopnum].oplen), allopcodes[curopnum].opc,\
 				&allopcodes[curopnum]);
 				
-				cout << i << ": Found new opcode " << allopcodes[curopnum].opc;
-				cout << " on line: " << allopcodes[curopnum].lnum;
+				cout << "line: " << curfl << " Found new opcode " << allopcodes[curopnum].opc;
+				cout << " at address: " << allopcodes[curopnum].lnum;
 				cout << " with type: " << allopcodes[curopnum].optype << endl;
 				//cout << " with length: " << allopcodes[curopnum].oplen << endl;
 				
@@ -181,7 +192,8 @@ int main(int argc, char* argv[]){
 			labelline = prevlabelline + 1;
 			labels[labelind].line = prevlabelline + 1;
 			//cout << "Now in label " << labeltemp << " at " << labelline << endl;
-			cout << "Now in label " << labels[labelind].label << " at " << labels[labelind].line << endl;
+			cout << labels[labelind].label << ":" << labels[labelind].line\
+			<< " from line " << i << endl;
 			labelind += 1;
 			
 		}
@@ -200,6 +212,13 @@ int main(int argc, char* argv[]){
 	}
 	
 	totalopcodes = curopnum; //need this to know how long opcode array is
+	
+	if(!foundcode){
+		cerr << "Error: No code label given by line " << curfl << endl;
+		return -1;
+	}
+	
+	//Calculate and print the stats about the program
 	dispStats(allopcodes, totalopcodes);
 	
 	return 0;
@@ -491,18 +510,26 @@ bool checkopcode(char* line, opline* opdata){
 	return false;
 }
 
-//given a set of characters by reference, converts any abcz to ABCZ
-bool toupper (char line[]){
+//given a set of characters, converts any abcz to ABCZ and puts it in array given by reference
+bool toupper (char srcline[], char destline[]){
 	int ind = 0;
+	//cout << "src: " << srcline << endl;
 	
-	while(line[ind] != '\0'){
-		if(line[ind] >= 97 && line[ind] <= 122){
-			line[ind] -= 32; //flip the 6th bit off to get UCASE
+	//cout << "noseg" << endl;
+	while(srcline[ind] != '\0'){
+		//cout << "seg" << srcline[ind] << endl;
+		if(srcline[ind] >= 97 && srcline[ind] <= 122){
+			destline[ind] = srcline[ind] - 32; //flip the 6th bit off to get UCASE
+		}
+		else{
+			destline[ind] = srcline[ind];
 		}
 		ind++;
 	}
 	//Shouldn't be needed, but safety first
-	line[ind] = '\0';
+	srcline[ind] = '\0';
+	//This is absolutely needed
+	destline[ind] = '\0';
 	
 	return true;
 }
@@ -652,8 +679,8 @@ int giveoptype(char operands[], int opval, opline* opdata){
 			break;
 		default:
 			//It can get here with too many inputs!
-			cerr << "Error: Too many operands on line " << opdata->lnum\
-			 << ": " << (operands);
+			cerr << "Error: Too many extra operands on line " << curfl\
+			<< "at address: " << opdata->lnum << ": " << (operands);
 			return -1;
 			//cerr << "How did the opr ind even get here?";
 	}
@@ -744,7 +771,8 @@ int giveoptype(char operands[], int opval, opline* opdata){
 					return 5;
 				}
 				else{
-					cerr << "Error: Invalid operands for opcode" << endl;
+					cerr << "Error: invalid operands for opcode"\
+					<< "on line " << curfl << endl;
 					return -1;
 				}
 			}
@@ -754,12 +782,14 @@ int giveoptype(char operands[], int opval, opline* opdata){
 					return 6;
 				}
 				else{
-					cerr << "Error: Invalid operands for opcode" << endl;
+					cerr << "Error: invalid operands for opcode"\
+					<< "on line " << curfl << endl;
 					return -1;
 				}
 			}
 			else{
-				cerr << "Error: REALLY Invalid operands for opcode" << endl;
+				cerr << "Error: REALLY invalid operands for opcode"\
+				<< "on line " << curfl << endl;
 				return -1;
 			}
 			
@@ -1030,6 +1060,56 @@ int wordcmp(char str1[], char str2[]){
 	}
 }
 
+//compares two words regardless of case
+int nocasewordcmp(char str1[], char str2[]){
+	char ustr1[NUM_COLS], ustr2[NUM_COLS];
+	int ind1=0, ind2=0;
+	
+	//segfaults for no reason
+	//toupper(str1, ustr1);
+	//toupper(str2, ustr2);
+	while(str1[ind1] != '\0'){
+		if(str1[ind1] >= 97 && str1[ind1] <= 122){
+			ustr1[ind1] = str1[ind1] - 32; //flip the 6th bit off to get UCASE
+		}
+		else{
+			ustr1[ind1] = str1[ind1];
+		}
+		ind1++;
+	}
+	ustr1[ind1] = '\0';
+	
+	while(str2[ind2] != '\0'){
+		if(str2[ind2] >= 97 && str2[ind2] <= 122){
+			ustr2[ind2] = str2[ind2] - 32; //flip the 6th bit off to get UCASE
+		}
+		else{
+			ustr2[ind2] = str2[ind2];
+		}
+		ind2++;
+	}
+	ustr2[ind2] = '\0';
+	
+	//cout << "Comparing: " << ustr1 << " " << ustr2 << endl;
+	
+	if(str1[0]==0 && str2[0]==0){
+		return 0;
+	}
+	if(str1[0] == str2[0]){
+		//keep calling strCmp until one is different than the cover
+		return wordcmp(ustr1+1, ustr2+1); //this is trippy
+	}
+	//str1 comes before alphabet than string2
+	//Technically this covers \0 cases too
+	else if(str1[0] < str2[0]){
+		return 1;
+	}
+	//Covers the case of char1 > char2: first word is later in the alphabet
+	else{
+		return -1;
+	}
+}
+
 //Checks all the labels
 //Error on ind repeats, invalid names, pointing to the same line
 //Fill in line numbers of labels for the jmp commands
@@ -1057,7 +1137,7 @@ void dispStats(opline opdata[], int opcount){
 	
 	//for each opcode we have recorded
 	for(int i=0; i < opcount; i++){
-		cout << "Opcode: " << opdata[i].opc << endl;
+		//cout << "Opcode: " << opdata[i].opc << endl;
 		curopval = opdata[i].opc;
 		if(curopval==1 || curopval==2 || curopval==100 || curopval==200){
 			ldsdc++;
@@ -1074,7 +1154,7 @@ void dispStats(opline opdata[], int opcount){
 		}
 		
 	}
-	
+	cout << endl;
 	cout << "Total number of assembly instructions: " << aluc+cmpjmpc+ldsdc << endl;
 	cout << "Number of Load/Store: " << ldsdc << endl;
 	cout << "Number of ALU: " << aluc << endl;
@@ -1121,7 +1201,7 @@ void dispStats(opline opdata[], int opcount){
  * 		√need to get current line number and store that with opdata
  * 
  * rest:
- * 		get the statistics calculated and printed out
+ * 		√get the statistics calculated and printed out
  * 
  * 
  */
