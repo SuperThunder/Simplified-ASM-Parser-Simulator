@@ -180,7 +180,7 @@ int main(int argc, char* argv[]){
 				//this is out here since after a label line with no value
 				//checkopcode isn't going to be true
 				labelline = prevlabelline; //no +1 here is a very subtle difference
-				labellineoffset += 1;
+				//labellineoffset += 1; //removed this to get rid of extra line from label
 			}
 			
 		}
