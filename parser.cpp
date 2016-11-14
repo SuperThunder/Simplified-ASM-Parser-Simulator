@@ -89,17 +89,17 @@ int main(int argc, char* argv[]){
 	numlines1 = fillfilelines(filelines, asmin);
 	numlines2 = removecruft(filelines, codelines, numlines1);
 
-	cout << "With cruft removed: " << numlines2 << " lines" << endl;
+	//cout << "With cruft removed: " << numlines2 << " lines" << endl;
 	
 	for(int i = 0; i < numlines2; i++){
-		cout << i << ':' << '\t' << codelines[i];
+		//cout << i << ':' << '\t' << codelines[i];
 	}
-	cout << endl;
+	//cout << endl;
 	
-	cout << "With unnecessary cases changed: " << endl;
+	//cout << "With unnecessary cases changed: " << endl;
 	for(int i = 0; i < numlines2; i++){
 		toupper(codelines[i], ucodelines[i]);
-		cout << ucodelines[i];
+		//cout << ucodelines[i];
 	}
 	
 	
@@ -122,7 +122,7 @@ int main(int argc, char* argv[]){
 				}
 				else{
 					foundcode = true;
-					cout << "Found Code label with address: " << labelline\
+					cout << "Code:" << labelline\
 					<< " on line: " << i << endl;
 					labellineoffset = 0; //reset the offset if we're in a new label
 					labelind += 1;
@@ -137,7 +137,7 @@ int main(int argc, char* argv[]){
 				else{
 					founddata = true;
 					//we don't reset the line offset for data, because it doesn't refer to code
-					cout << "Found Data label with address: " << labelline\
+					cout << "Data:" << labelline\
 					<< " on line: " << i << endl;
 					labelind += 1;
 					labelline = prevlabelline; //do this as well since DATA label doesn't affect the code
@@ -167,9 +167,9 @@ int main(int argc, char* argv[]){
 				(codelines[i]+allopcodes[curopnum].oplen), allopcodes[curopnum].opc,\
 				&allopcodes[curopnum]);
 				
-				cout << "line: " << curfl << " Found new opcode " << allopcodes[curopnum].opc;
-				cout << " at address: " << allopcodes[curopnum].lnum;
-				cout << " with type: " << allopcodes[curopnum].optype << endl;
+				//cout << "line: " << curfl << " Found new opcode " << allopcodes[curopnum].opc;
+				//cout << " at address: " << allopcodes[curopnum].lnum;
+				//cout << " with type: " << allopcodes[curopnum].optype << endl;
 				//cout << " with length: " << allopcodes[curopnum].oplen << endl;
 				
 				//iterate counters
@@ -242,7 +242,7 @@ int fillfilelines(char filelines[][255], ifstream& asmin){
 	}
 	
 	for(int i = 0; i < line; i++){
-		cout << filelines[i] << endl;
+		//cout << filelines[i] << endl;
 	}
 	
 	return line;
@@ -353,7 +353,7 @@ int findlabel(char line[], char label[], labeldata* labelstruct){
 	//No number after colon
 	if(line[colloc+1] == '\0' || line[colloc+1] == '\n'){
 		copy(label, label+colloc, labelstruct->label);
-		cout << endl << "Found label with no new address " << endl;
+		//cout << endl << "Found label with no new address " << endl;
 		return -2;
 	}
 	
@@ -387,7 +387,7 @@ int findlabel(char line[], char label[], labeldata* labelstruct){
 	copy(label, label+colloc, labelstruct->label);
 	labelstruct->line = address;
 		
-	cout << endl << "Found label with address " << address << endl;
+	//cout << endl << "Found label with address " << address << endl;
 	
 	return address;
 }
@@ -437,7 +437,7 @@ bool checkopcode(char* line, opline* opdata){
 		//if the opcode is still a match
 		if(opmatch){
 			oplen = 4;
-			cout << "Matching 4 char opcode: " << endl;
+			//cout << "Matching 4 char opcode: " << endl;
 			//get and set the opcode value
 			opcval = giveopval(opcodes4[op], oplen);
 			opdata->opc = opcval;
@@ -1115,12 +1115,13 @@ int nocasewordcmp(char str1[], char str2[]){
 //Fill in line numbers of labels for the jmp commands
 int preparse(char* filelines[]){
 	//first task: find every instance of a label; figure out the line number
-	
+	//identifiers: first character of J; [ and then ] on same line
 	
 	//second task: check for duplicates, labels on adjacent lines
+	//Could simply go through list and check each value for this
 	
 	
-	//third task: replace every label that is given to a jump with its line number
+	//third task: replace every label that is given to a jump with its address
 	
 	
 }
