@@ -25,7 +25,7 @@ struct opline{
 	int opd3;
 	int oplen; //character length of the operand (used for sending operands)
 	int optype; //the type (1 to 7) of operands the opcode has
-	int lnum; //line number of command
+	int lnum; //line number of command: this is address, not file line!
 };
 
 struct labeldata{
@@ -125,8 +125,11 @@ int main(int argc, char* argv[]){
 			if(nocasewordcmp("CODE", labels[labelind].label) == 0){
 			//handles special case of code label being found
 				if(foundcode){
-					cerr << "Error on line " << curfl <<  " duplicated Code label with value " << labelline << endl;
+					cerr << "Error on line " << curfl <<  " duplicated Code directive label with value " << labelline << endl;
 					 return -1;
+				}
+				//no value for code label
+				else if(labelline == -2){	
 				}
 				else{
 					foundcode = true;
@@ -139,8 +142,11 @@ int main(int argc, char* argv[]){
 			else if(nocasewordcmp("DATA", labels[labelind].label) == 0){
 				//if it was already found
 				if(founddata){
-					cerr << "Error on line " << curfl << " duplicated Data label" << endl;
+					cerr << "Error on line " << curfl << " duplicated Data directive label" << endl;
 					return -1;
+				}
+				//no value for data label
+				else if(labelline == - 2){	
 				}
 				else{
 					founddata = true;
@@ -227,7 +233,7 @@ int main(int argc, char* argv[]){
 	totalopcodes = curopnum; //need this to know how long opcode array is
 	
 	if(!foundcode){
-		cerr << "Error on line " << curfl <<  ", no code label given by line " << endl;
+		cerr << "Error on line " << curfl <<  ", no code directive label given by line " << endl;
 		return -1;
 	}
 	
@@ -442,7 +448,7 @@ bool checkopcode(char* line, opline* opdata){
 	for(int op = 0; op < 6; op++){
 		opmatch = true;
 		//pretty much a bad word cmp, should write one
-		//and a string tokenizer/splitter
+		//and a word tokenizer/splitter
 		for(int ind = 0; ind < 5; ind++){
 			if(line[ind] == '\0' || opcodes4[op][ind] == '\0'){
 				//return false; //probably ended up here from early development, quite the bug
@@ -628,7 +634,7 @@ int giveopval(char opcode[], int oplen){
 				return 2;
 			}
 			else if(cmpop(opcode, "JZ")){
-				return 7;
+				return 8;
 			}
 			else{
 				cerr << "Error on " << curfl << " Reached end of opcode values for valid opcode" << endl;
@@ -663,10 +669,16 @@ int giveoptype(char operands[], int opval, opline* opdata){
 			//cout << "Encountered: " << int(operands[ind]) << endl;
 			curop[curopind] = '\0';
 			//cout << "Sending: " << curop << endl;
+			
+			//if(operands[ind] == ',' && !(numchar(operands[ind+1]) || alphachar(operands[ind+1]))){
+			if(operands[ind] == ',' && operands[ind+1] == ','){
+				cerr << "Error on line " << curfl << " expected operand between commas" << endl;
+				return -1;
+			}
 			retcode = giveoperand(curop);
 			//cout << "Was returned: " << retcode << endl;
 			if(retcode == -1000){
-				cerr << "Error on line " << curfl << " invalid operands" << endl;
+				cerr << "Error on line " << curfl << " invalid operands for opcode" << endl;
 				return -1;
 			}
 			//cout << "Returned: " << retcode << endl;
@@ -698,12 +710,14 @@ int giveoptype(char operands[], int opval, opline* opdata){
 		case 1:
 			opdata->opd1 = opr[0]; 
 			break;
+		case 0:
+			cerr << "Error on line " << curfl << "invalid operand" << endl;
 		default:
 			//It can get here with too many inputs!
 			cerr << "Error on line " << curfl << " extra operands"\
 			<< "at address: " << opdata->lnum << ": " << (operands);
 			return -1;
-			//cerr << "How did the opr ind even get here?";
+		
 	}
 	
 	//GIANT SWITCHES/IFS HERE TO DETERMINE OPTYPE BY OPERANDS
@@ -742,7 +756,10 @@ int giveoptype(char operands[], int opval, opline* opdata){
 						return 3;
 					}
 					else{
-						cerr << "Error on line " << curfl << " invalid operands for opcode" << endl;
+						//It's kind of cludgy to state every type of operand error may have happened
+						//But it gets the job done
+						cerr << "Error on line " << curfl << " invalid operands for opcode"\
+						<< " maybe missing, duplicated, or invalid" << endl;
 						return -1;
 					}
 				}
@@ -753,7 +770,8 @@ int giveoptype(char operands[], int opval, opline* opdata){
 						return 1;
 					}
 					else{
-						cerr << "Error on line" << curfl << " invalid operands for opcode" << endl;
+						cerr << "Error on line " << curfl << " invalid operands for opcode"\
+						<< " maybe missing, duplicated, or invalid" << endl;
 						return -1;
 					}
 				}
@@ -766,7 +784,8 @@ int giveoptype(char operands[], int opval, opline* opdata){
 						return 4;
 					}
 					else{
-						cerr << "Error on line" << curfl << " invalid operands for opcode" << endl;
+						cerr << "Error on line " << curfl << " invalid operands for opcode"\
+						<< " maybe missing, duplicated, or invalid" << endl;
 						return -1;	
 					}
 				}
@@ -778,7 +797,8 @@ int giveoptype(char operands[], int opval, opline* opdata){
 							return 2;
 						}
 						else{
-							cerr << "Error on line" << curfl << " invalid operands for opcode" << endl;
+							cerr << "Error on line " << curfl << " invalid operands for opcode"\
+							<< " maybe missing, duplicated, or invalid" << endl;
 							return -1;
 						}
 					//}
@@ -793,7 +813,8 @@ int giveoptype(char operands[], int opval, opline* opdata){
 					return 5;
 				}
 				else{
-					cerr << "Error on line " << curfl << " invalid operands for opcode" << endl;
+					cerr << "Error on line " << curfl << " invalid operands for opcode"\
+					<< " maybe missing, duplicated, or invalid" << endl;
 					return -1;
 				}
 			}
@@ -803,13 +824,13 @@ int giveoptype(char operands[], int opval, opline* opdata){
 					return 6;
 				}
 				else{
-					cerr << "Error on line" << curfl << endl;
+					cerr << "Error on line " << curfl << " invalid operands for opcode"\
+					<< " maybe missing, duplicated, or invalid" << endl;
 					return -1;
 				}
 			}
 			else{
-				cerr << "Error on line " << curfl << " REALLY invalid operands for opcode"\
-				<< " on line " << endl;
+				cerr << "Error on line " << curfl << " REALLY invalid operands for opcode" << endl;
 				return -1;
 			}
 			
@@ -874,6 +895,7 @@ bool validopt(int opval, int optype){
 			}
 			else{
 				cerr << "Error: Expected <location, register> or <register, register> for LD" << endl;
+				cerr << "Error on line " << curfl << " you are either missing or have extra operands" << endl;
 				return false;
 			}
 		case 2:
@@ -918,6 +940,7 @@ bool validopt(int opval, int optype){
 			}
 			else{
 				cerr << "Error: Expected <register, location> for conditional jump opcode" << endl;
+				return false;
 			}
 		case 100:
 			if(optype == 1){
@@ -933,6 +956,7 @@ bool validopt(int opval, int optype){
 			}
 			else{
 				cerr << "Error: Expected <number, register> or <number, location> for SDi" << endl;
+				return false;
 			}
 		case 300:
 		case 400:
@@ -1069,7 +1093,7 @@ int wordcmp(char str1[], char str2[]){
 		//keep calling strCmp until one is different than the cover
 		return wordcmp(str1+1, str2+1); //this is trippy
 	}
-	//str1 comes before alphabet than string2
+	//str1 comes before alphabet than str2
 	//Technically this covers \0 cases too
 	else if(str1[0] < str2[0]){
 		return 1;
@@ -1119,7 +1143,7 @@ int nocasewordcmp(char str1[], char str2[]){
 		//keep calling strCmp until one is different than the cover
 		return wordcmp(ustr1+1, ustr2+1); //this is trippy
 	}
-	//str1 comes before alphabet than string2
+	//str1 comes before alphabet than str2
 	//Technically this covers \0 cases too
 	else if(str1[0] < str2[0]){
 		return 1;

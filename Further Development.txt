@@ -1,11 +1,13 @@
 Test cases:
-
+Labels cannot have punctuation, only alphanumeric
+An opcode has an invalid value attached to it: ex SD1
 Same label appears twice
 Jump to valid label
 	need to have index of label line numbers
 	or replace labels with numbers
 	preparse file to find all labels, then replace labels with line numbers
-
+	or create some kind of sentinel for each [] and fill them at the end	
+	
 Jump to invalid label
 Assembly execution starts from code label without number (no base reference - invalid?)
 
