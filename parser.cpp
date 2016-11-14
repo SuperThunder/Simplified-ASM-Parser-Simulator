@@ -99,7 +99,7 @@ int main(int argc, char* argv[]){
 	//cout << "With unnecessary cases changed: " << endl;
 	for(int i = 0; i < numlines2; i++){
 		toupper(codelines[i], ucodelines[i]);
-		//cout << ucodelines[i];
+		cerr << ucodelines[i];
 	}
 	
 	
@@ -116,14 +116,13 @@ int main(int argc, char* argv[]){
 			if(nocasewordcmp("CODE", labels[labelind].label) == 0){
 			//handles special case of code label being found
 				if(foundcode){
-					cerr << "Error: Code label redeclared on line " << i <<\
+					cerr << "Error: Code label duplicated on line " << i <<\
 					" with value " << labelline << endl;
 					 return -1;
 				}
 				else{
 					foundcode = true;
-					cout << "Code:" << labelline\
-					<< " on line: " << i << endl;
+					cout << "Code:" << labelline << endl;
 					labellineoffset = 0; //reset the offset if we're in a new label
 					labelind += 1;
 				}
@@ -131,21 +130,19 @@ int main(int argc, char* argv[]){
 			else if(nocasewordcmp("DATA", labels[labelind].label) == 0){
 				//if it was already found
 				if(founddata){
-					cerr << "Error: Redeclaration of Data label on line: " << i << endl;
+					cerr << "Error: Duplicated of Data label on line: " << i << endl;
 					return -1;
 				}
 				else{
 					founddata = true;
 					//we don't reset the line offset for data, because it doesn't refer to code
-					cout << "Data:" << labelline\
-					<< " on line: " << i << endl;
+					cout << "Data:" << labelline << endl;
 					labelind += 1;
 					labelline = prevlabelline; //do this as well since DATA label doesn't affect the code
 				}
 			}
 			else{
-				cout << labeltemp << ":" << labelline\
-				<< " from line " << i << endl;
+				cout << labeltemp << ":" << labelline << i << endl;
 				//cout << "Now in label " << labels[labelind].label << " at " << labels[labelind].line << endl;
 				labellineoffset = 0; //reset the offset if we're in a new label
 				labelind += 1;
@@ -188,12 +185,12 @@ int main(int argc, char* argv[]){
 			//We found a label, but it didn't have a specific line
 			//Work off the distance from the known label line
 			//This does rely on people AT LEAST giving the code label a line
-			labellineoffset += 1;
-			labelline = prevlabelline + 1;
+			labellineoffset += 0; //ASSUMING NEW LABEL DOESN't CHANGE ADDRESS
+			labelline = prevlabelline + 0;
 			labels[labelind].line = prevlabelline + 1;
 			//cout << "Now in label " << labeltemp << " at " << labelline << endl;
-			cout << labels[labelind].label << ":" << labels[labelind].line\
-			<< " from line " << i << endl;
+			cout << labels[labelind].label << ":" << labels[labelind].line << endl;
+			//<< " from line " << i << endl;
 			labelind += 1;
 			
 		}
@@ -203,7 +200,7 @@ int main(int argc, char* argv[]){
 		}
 		else{
 			//Should be only triggered by error
-			cerr << "Invalid on line " << i << " , program exiting" << endl; 
+			cerr << "Error on line " << i << " , program exiting" << endl; 
 			return -1;
 		}
 			//cout << prevlabelline << " = " << labelline;
@@ -214,7 +211,7 @@ int main(int argc, char* argv[]){
 	totalopcodes = curopnum; //need this to know how long opcode array is
 	
 	if(!foundcode){
-		cerr << "Error: No code label given by line " << curfl << endl;
+		cerr << "Error on line " << curfl <<  ", no code label given by line " << endl;
 		return -1;
 	}
 	
@@ -242,7 +239,7 @@ int fillfilelines(char filelines[][255], ifstream& asmin){
 	}
 	
 	for(int i = 0; i < line; i++){
-		//cout << filelines[i] << endl;
+		cout << filelines[i] << endl;
 	}
 	
 	return line;
@@ -506,7 +503,7 @@ bool checkopcode(char* line, opline* opdata){
 		}
 	}	
 	
-	cerr << "Error parsing opcodes and operands" << endl;
+	cerr << "Error on line " << curfl << "parsing opcode and operands" << endl;
 	return false;
 }
 
@@ -558,7 +555,7 @@ int giveopval(char opcode[], int oplen){
 				return 13;
 			}
 			else{
-				cerr << "Error: Reached end of opcode values for valid opcode" << endl;
+				cerr << "Error on " << curfl << " Reached end of opcode values for valid opcode" << endl;
 				return -1;
 			}
 			break;
@@ -595,7 +592,7 @@ int giveopval(char opcode[], int oplen){
 				return 12;
 			}
 			else{
-				cerr << "Error: Reached end of opcode values for valid opcode" << endl;
+				cerr << "Error on " << curfl << " Reached end of opcode values for valid opcode" << endl;
 				return -1;
 			}
 			break;
@@ -611,7 +608,8 @@ int giveopval(char opcode[], int oplen){
 				return 7;
 			}
 			else{
-				cerr << "Error: Reached end of opcode values for valid opcode" << endl;
+				cerr << "Error on " << curfl << " Reached end of opcode values for valid opcode" << endl;
+				return -1;
 			}
 			break;
 			
