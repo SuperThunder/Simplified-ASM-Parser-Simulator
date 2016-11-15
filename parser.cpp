@@ -175,6 +175,11 @@ int main(int argc, char* argv[]){
 				//cout << "Calling giveoptype with: " << codelines[i]+allopcodes[curopnum].oplen << endl;
 				//cout << "\t" << allopcodes[curopnum].opc;
 				//cout << "\t" << allopcodes[curopnum].lnum << endl;
+				//ensure that code directive has already appeared
+				if(!foundcode){
+					cerr << "Error on line " << curfl << ", code directive must come before any opcodes!" << endl;
+					return -1;
+				}
 				prevwaslabel = false;
 				allopcodes[curopnum].lnum = prevlabelline + 1;
 				allopcodes[curopnum].optype = giveoptype(\
@@ -233,7 +238,8 @@ int main(int argc, char* argv[]){
 	totalopcodes = curopnum; //need this to know how long opcode array is
 	
 	if(!foundcode){
-		cerr << "Error on line " << curfl <<  ", no code directive label given by line " << endl;
+		//the code label is meant to be before code
+		cerr << "Error on line 1, no Code directive given" << endl;
 		return -1;
 	}
 	
@@ -358,6 +364,11 @@ int findlabel(char line[], char label[], labeldata* labelstruct){
 			colloc = ind;
 			foundcol = true;
 			label[ind] = '\0'; //once colon is found, label name is over
+		}
+		//Apart for the colon, label characters can only be 
+		else if(!(alphachar(line[ind]) || numchar(line[ind]))){
+			cerr << "Error on line " << curfl << " invalid character for label"\
+			<< "'" << line[ind] << "'" << endl;
 		}
 		if(!foundcol){
 			label[ind] = line[ind]; //fill in the label name
@@ -658,6 +669,7 @@ int giveoptype(char operands[], int opval, opline* opdata){
 	int ind = 0, curopind = 0, oprind = 0;
 	int opr[3];
 	char curop[11];
+	
 	//cout << "Operands: " << operands << endl;
 	
 	//get the optype by checking each operand
@@ -678,7 +690,8 @@ int giveoptype(char operands[], int opval, opline* opdata){
 			retcode = giveoperand(curop);
 			//cout << "Was returned: " << retcode << endl;
 			if(retcode == -1000){
-				cerr << "Error on line " << curfl << " invalid operands for opcode" << endl;
+				cerr << "Error on line " << curfl << " invalid operands for opcode;"\
+				" perhaps extra, missing, duplicated, or invalid" << endl;
 				return -1;
 			}
 			//cout << "Returned: " << retcode << endl;
@@ -715,7 +728,7 @@ int giveoptype(char operands[], int opval, opline* opdata){
 		default:
 			//It can get here with too many inputs!
 			cerr << "Error on line " << curfl << " extra operands"\
-			<< "at address: " << opdata->lnum << ": " << (operands);
+			<< " at address: " << opdata->lnum << ": " << (operands);
 			return -1;
 		
 	}
@@ -830,7 +843,8 @@ int giveoptype(char operands[], int opval, opline* opdata){
 				}
 			}
 			else{
-				cerr << "Error on line " << curfl << " REALLY invalid operands for opcode" << endl;
+				cerr << "Error on line " << curfl << " REALLY invalid operands for opcode\
+						missing, extra, duplicated, or invalid?" << endl;
 				return -1;
 			}
 			
@@ -885,6 +899,17 @@ int giveoptype(char operands[], int opval, opline* opdata){
 }
 
 bool validopt(int opval, int optype){
+	//precheck for too many operands
+	if(opval < 0){
+		cerr << "Error on line " << curfl << " invalid opcode value given" << endl;
+		return false;
+	}
+	//all the opcodes except ALU and ALUi take max 2 arguments
+	if((opval < 3 || opval > 7) && opval < 100){
+		if(optype == 5 || optype == 6){
+			cerr << "Error on line " << curfl << " extra operands" << endl;
+		}
+	}
 	//unfortunately have to go the long way for proper errors
 	//cout << "Called with opval: " << opval << " checking for optype: " << optype << endl; 
 	switch(opval){
@@ -983,8 +1008,15 @@ int giveoperand(char segm[]){
 	//1 digit register
 	int regval;
 	//cout << "Checking: " << segm << endl;
+	//First check that register isn't too big, and that it has valid char after
+	if(segm[0] == 'R' && numchar(segm[1]) && numchar(segm[3])){
+		cerr << "Error on line " << curfl << " access to non-existent register" << endl;
+	}
 	//Need to check for two digits first, since a valid two digit is a valid one digit
-	if(segm[0] == 'R' && numchar(segm[1]) && numchar(segm[2])){
+	else if(segm[0] == 'R' && numchar(segm[1]) && numchar(segm[2])){
+		if(segm[3] != '\n' && segm[3] != ',' && segm[3] != '\0'){
+			cerr << "Error on line " << curfl << " bad register name" << endl;
+		}
 		regval = 10*(segm[1]-'0')+(segm[2]-'0');
 		regval *= -1;
 		//cout << "Found register__: " << regval << endl; 
@@ -992,6 +1024,9 @@ int giveoperand(char segm[]){
 	}
 	//2 digit register
 	else if(segm[0] == 'R' && numchar(segm[1])){
+		if(segm[2] != '\n' && segm[2] != ',' && segm[2] != '\0'){
+			cerr << "Error on line " << curfl << " bad register name" << endl;
+		}
 		regval = int(segm[1]-'0');
 		regval *= -1;
 		//cout << "Found register_: " << regval << endl; 
@@ -1004,6 +1039,7 @@ int giveoperand(char segm[]){
 	int ind = 0;
 	char num[20];
 	while(segm[ind] != '\0' && segm[ind] != ','){
+		//cout << "char: " << segm[ind] << endl;
 		if(numchar(segm[ind])){
 			//cout << "Adding: " << segm[ind];
 			num[ind] = segm[ind];
@@ -1012,6 +1048,10 @@ int giveoperand(char segm[]){
 		else if(segm[ind] == '-' && ind == 0){
 			num[ind] = segm[ind];
 			ind++;
+		}
+		else if (segm[ind] == '.'){
+			cerr << "Error on line " << curfl << " extra precision numbers are not supported" << endl;
+			return -1000;
 		}
 		else{
 			cerr << "Error on line " << curfl <<  " invalid character for numerical operand (giveoperand)" << endl;

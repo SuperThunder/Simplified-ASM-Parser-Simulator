@@ -1,19 +1,19 @@
 Test cases:
-Labels cannot have punctuation, only alphanumeric
-An opcode has an invalid value attached to it: ex SD1
-Same label appears twice
-Jump to valid label
+Jump to valid label, ex JMP [Code]
 	need to have index of label line numbers
 	or replace labels with numbers
 	preparse file to find all labels, then replace labels with line numbers
 	or create some kind of sentinel for each [] and fill them at the end	
 	
 Jump to invalid label
-Assembly execution starts from code label without number (no base reference - invalid?)
 
+An opcode has an invalid value attached to it: ex SD1
+Same label appears twice
 
 
 More code than space for code (code overflows label)
+
+
 
 If program was to be rewritten (because parser2 is a mess):
 	Parse all the file lines into a special struct array type
