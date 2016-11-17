@@ -49,8 +49,10 @@ bool cmpop(char op1[], char op2[]);
 bool numchar(char in);
 int wordcmp(char str1[], char str2[]);
 int nocasewordcmp(char str1[], char str2[]);
-int labelLookup(char label, labeldata* labels[], int len);
+int labelLookup(char label[], labeldata* labels[], int len);
+bool isDupLabel(char label[], labeldata labels[], int len);
 void dispStats(opline opdata[], int opcount);
+void dispData(opline opcodes[], labeldata labels[], int opnum, int labnum);
 
 //global variable for current file line; forgive me
 int curfl = 0;
@@ -122,6 +124,12 @@ int main(int argc, char* argv[]){
 		labelline = findlabel(codelines[i], labeltemp, &labels[labelind]);
 		if(labelline >= 0){
 			//check if we got the code label
+			//cout << "Checking: " << labels[labelind].label << endl;
+			if(isDupLabel(labels[labelind].label, labels, labelind-1)){
+				cout << "Duplicate label was found" << endl;
+				return -1;
+			}
+			
 			if(nocasewordcmp("CODE", labels[labelind].label) == 0){
 			//handles special case of code label being found
 				if(foundcode){
@@ -195,18 +203,22 @@ int main(int argc, char* argv[]){
 				curopnum += 1;
 				labelline = prevlabelline + 1;
 				labellineoffset += 1;
-			}else{
+			/*}else{
 				//this is out here since after a label line with no value
 				//checkopcode isn't going to be true
 				labelline = prevlabelline; //no +1 here is a very subtle difference
-				//labellineoffset += 1; //removed this to get rid of extra line from label
-			}
+				*///labellineoffset += 1; //removed this to get rid of extra line from label
+			} //possibly deprecated by -2 return code
 			
 		}
 		else if(labelline == -2){
 			//We found a label, but it didn't have a specific line
 			//Work off the distance from the known label line
 			//This does rely on people AT LEAST giving the code label a line
+			
+			if(isDupLabel(labels[labelind].label, labels, labelind-1)){
+				return -1;
+			}
 			labellineoffset += 0; //ASSUMING NEW LABEL DOESN'T CHANGE ADDRESS
 			labelline = prevlabelline + 0;
 			//if the previous was label, don't give this label new line
@@ -227,7 +239,7 @@ int main(int argc, char* argv[]){
 		}
 		else{
 			//Should be only triggered by error
-			cerr << "Error on line " << curfl << " , program exiting" << endl; 
+			cerr << "Error on line " << curfl << ", program exiting" << endl; 
 			return -1;
 		}
 			//cout << prevlabelline << " = " << labelline;
@@ -245,6 +257,12 @@ int main(int argc, char* argv[]){
 	
 	//Calculate and print the stats about the program
 	dispStats(allopcodes, totalopcodes);
+	
+	//Show data collected by program
+	
+	cout << endl << endl << "---------------------------------" << endl;
+	dispData(allopcodes, labels, curopnum, labelind);
+	
 	
 	return 0;
 }
@@ -347,28 +365,29 @@ int findlabel(char line[], char label[], labeldata* labelstruct){
 	int ind = 0;
 	int colloc, endloc, address;
 	bool foundcol = false;
+	bool foundinvchar = false;
 	//bool colfound = false;
 	char foundnum[NUM_COLS];
 	
 	//Check that first char is OK
 	if(!alphachar(line[0])){
-		cout << "Invalid label starting character: " << line[0] << endl;
-		return -100;
+		cerr << "Error on line " << curfl << " invalid label starting character: " << line[0] << endl;
+		//return -100;
 	}
 	
 	//Used to segfault here because of || rather than && for truth condition
 	//Both of the delineating characters, to be safe
 	while(line[ind] != '\n' && line[ind] != '\0'){
 		//Find the index of the colon in the label char array
+		
 		if(line[ind] == ':'){
 			colloc = ind;
 			foundcol = true;
 			label[ind] = '\0'; //once colon is found, label name is over
 		}
-		//Apart for the colon, label characters can only be 
+		//Apart for the colon, label characters can only be alphanumeric
 		else if(!(alphachar(line[ind]) || numchar(line[ind]))){
-			cerr << "Error on line " << curfl << " invalid character for label"\
-			<< "'" << line[ind] << "'" << endl;
+			foundinvchar = true;
 		}
 		if(!foundcol){
 			label[ind] = line[ind]; //fill in the label name
@@ -386,6 +405,11 @@ int findlabel(char line[], char label[], labeldata* labelstruct){
 	if(!foundcol){
 		return -1;
 	}
+	if(foundinvchar){
+		cerr << "Error on line " << curfl << " invalid character for label"\
+			<< " '" << line[ind] << "'" << endl;
+	}
+	
 	
 	//No number after colon
 	if(line[colloc+1] == '\0' || line[colloc+1] == '\n'){
@@ -1112,10 +1136,11 @@ bool numchar(char in){
 
 bool alphachar(char in){
 	//Capital letter
-	if(in >= 65 || in <= 90){
+	if(in >= 65 && in <= 90){
 		return true;
 	}
-	else if(in >= 97 || in <= 122){
+	//Lowercase letter
+	else if(in >= 97 && in <= 122){
 		return true;
 	}
 	else{
@@ -1149,6 +1174,8 @@ int nocasewordcmp(char str1[], char str2[]){
 	char ustr1[NUM_COLS], ustr2[NUM_COLS];
 	int ind1=0, ind2=0;
 	
+	//cout << "Given: " << str1 << "   " << str2 << endl;
+	
 	//segfaults for no reason
 	//toupper(str1, ustr1);
 	//toupper(str2, ustr2);
@@ -1181,6 +1208,7 @@ int nocasewordcmp(char str1[], char str2[]){
 	}
 	if(str1[0] == str2[0]){
 		//keep calling strCmp until one is different than the cover
+		//cout << "cmpMatched: " << str1 << "   " << str2 << endl;
 		return wordcmp(ustr1+1, ustr2+1); //this is trippy
 	}
 	//str1 comes before alphabet than str2
@@ -1212,8 +1240,72 @@ int preparse(char* filelines[]){
 
 //Returns the program line of a label
 //Returns -1 if label DNE in array
-int labelLookup(char label, labeldata* labels[], int len){
+//Returns -2 if label is duplicated
+int labelLookup(char label[], labeldata* labels[], int numlabels){
+	int line, cmp;
+	enum lookupState{FOUND, DUP, NOTFOUND};
+	lookupState state = NOTFOUND;
 	
+	for(int k = 0; k < numlabels; k++){
+		cout << labels[k]->line << ": " << labels[k]->label << endl;
+	}
+	
+	for(int i = 0; i < numlabels; i++){
+		//cout << "s: " << state << endl;
+		//cout << endl << "calling: " << i << ": " << label << "  " << labels[i]->label << endl;
+		cmp = nocasewordcmp(label, labels[i]->label);
+		//	cout << "cmp: " << cmp << endl;
+		if (cmp == 0){
+			if(state == FOUND){
+				state = DUP;
+				cerr << "Error on line " << curfl << "duplicate: " << label << "   " << labels[i]->label << endl;
+				return -2;
+			}
+			//got very nasty bug from instinctively treating !FOUND like a boolean
+			else if(state == NOTFOUND){
+				state = FOUND;
+				//cout << "Matched: " << label << "   " << labels[i]->label << endl;
+				line = labels[i]->line;
+			}
+			else{
+				cout << "How did we even end up here?" << endl;
+			}
+		}
+		else{
+			cout << "Did not match: " << label << "   " << labels[i]->label << endl;
+		}
+		cout << "s2: " << state << endl;
+	}
+	
+	if(state == FOUND){
+		return line;
+	}
+	else{
+		return -1;
+	}
+}
+
+//Called when a label is found to check for duplicates
+bool isDupLabel(char label[], labeldata labels[], int numlabels){
+	//cout << "Cur number of labels: " << numlabels << endl;
+	int line, cmp;
+	
+	for(int k = 0; k < numlabels; k++){
+		cout << labels[k].line << ": " << labels[k].label << endl;
+	}
+	
+	for(int i = 0; i < numlabels; i++){
+		//cout << "s: " << state << endl;
+		//cout << endl << "calling: " << i << ": " << label << "  " << labels[i]->label << endl;
+		cmp = nocasewordcmp(label, labels[i].label);
+		//	cout << "cmp: " << cmp << endl;
+		if (cmp == 0){
+				cerr << "Error on line " << curfl << " duplicate label: " << label << "   " << labels[i].label << endl;
+				return -2;
+		}
+	}
+	
+	return false;
 }
 
 //Prints out the stats about the program
@@ -1246,6 +1338,16 @@ void dispStats(opline opdata[], int opcount){
 	cout << "Number of ALU: " << aluc << endl;
 	cout << "Number of Compare/Jump: " << cmpjmpc << endl;
 	 
+}
+
+//Shows what data has been recorded for opcodes and structs
+void dispData(opline opcodes[], labeldata labels[], int opnum, int labnum){
+	for(int i = 0; i < opnum; i++){
+		cout <<  opcodes[i].lnum << ": " << opcodes[i].opc << " " << opcodes[i].opd1 << " " << opcodes[i].opd2 << " " << opcodes[i].opd3 << " " << opcodes[i].optype << endl;
+	}
+	for(int k = 0; k < labnum; k++){
+		cout << labels[k].line << ": " << labels[k].label << endl;
+	}
 }
 
 /* √Can reprocess code into pure 2d array with multiple filters
