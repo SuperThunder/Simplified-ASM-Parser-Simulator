@@ -127,7 +127,7 @@ int main(int argc, char* argv[]){
 			//cout << "Checking: " << labels[labelind].label << endl;
 			if(isDupLabel(labels[labelind].label, labels, labelind-1)){
 				cout << "Duplicate label was found" << endl;
-				return -1;
+				//return -1; //every duplicate needs to be caught
 			}
 			
 			if(nocasewordcmp("CODE", labels[labelind].label) == 0){
@@ -217,7 +217,7 @@ int main(int argc, char* argv[]){
 			//This does rely on people AT LEAST giving the code label a line
 			
 			if(isDupLabel(labels[labelind].label, labels, labelind-1)){
-				return -1;
+				//return -1; //no fast fail here
 			}
 			labellineoffset += 0; //ASSUMING NEW LABEL DOESN'T CHANGE ADDRESS
 			labelline = prevlabelline + 0;
@@ -1226,6 +1226,12 @@ int nocasewordcmp(char str1[], char str2[]){
 //Error on ind repeats, invalid names, pointing to the same line
 //Fill in line numbers of labels for the jmp commands
 int preparse(char* filelines[]){
+	//Can take skeleton structure of main to preparse label lines
+	//Go through every line in advance and only use label functions from main
+	//Once the address of every label has been found, they can be filled in
+	//To there [...label...]s are
+	//Technically label parsing runs twice, but my time is limited and CPU cycles are not
+	
 	//first task: find every instance of a label; figure out the line number
 	//identifiers: first character of J; [ and then ] on same line
 	
