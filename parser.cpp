@@ -52,7 +52,7 @@ int nocasewordcmp(char str1[], char str2[]);
 int labelLookup(char label[], labeldata* labels[], int len);
 int preparse(char filelines[][NUM_COLS], int linec);
 bool isDupLabel(char label[], labeldata labels[], int len);
-int tokfind(char src[], const char ltok, const char rtok, char token[], int ind);
+int tokfind(char src[], const char ltok, const char rtok, char token[], int ind, int& lentok);
 void dispStats(opline opdata[], int opcount);
 void dispData(opline opcodes[], labeldata labels[], int opnum, int labnum);
 
@@ -194,7 +194,7 @@ int main(int argc, char* argv[]){
 					return -1;
 				}
 				prevwaslabel = false;
-				allopcodes[curopnum].lnum = prevlabelline + 1;
+				allopcodes[curopnum].lnum = prevlabelline + 0;
 				allopcodes[curopnum].optype = giveoptype(\
 				(codelines[i]+allopcodes[curopnum].oplen), allopcodes[curopnum].opc,\
 				&allopcodes[curopnum]);
@@ -732,6 +732,7 @@ int giveoptype(char operands[], int opval, opline* opdata){
 		}
 		else{
 			//cout << "Putting " << operands[ind] << " in" << endl;
+			//cout << "next: " << int(operands[ind+1]) << endl;
 			curop[curopind] = operands[ind];
 			curopind++;
 		}	
@@ -753,7 +754,8 @@ int giveoptype(char operands[], int opval, opline* opdata){
 			opdata->opd1 = opr[0]; 
 			break;
 		case 0:
-			cerr << "Error on line " << curfl << "invalid operand" << endl;
+			cerr << "Error on line " << curfl << " invalid operand (no operand)" << endl;
+			return -1;
 		default:
 			//It can get here with too many inputs!
 			cerr << "Error on line " << curfl << " extra operands"\
@@ -1321,7 +1323,7 @@ int preparse(char filelines[][NUM_COLS], int linec){
 		else{
 			//Should be only triggered by error
 		}
-			prevlabelline = labelline;
+		prevlabelline = labelline;
 	}
 	
 	
@@ -1330,8 +1332,7 @@ int preparse(char filelines[][NUM_COLS], int linec){
 		cout << labels[i].line << ": " << labels[i].label << endl;
 	}
 	char temptok[255];
-	char tempnum[255];
-	int templine, lennum;
+	int templine, lennum, lentok;
 	//We've got the labels, now we need to find the jumps to labels
 	int tokind = 0; //current index of string we are scanning
 	for(int i = 0; i < linec; i++){
@@ -1340,18 +1341,24 @@ int preparse(char filelines[][NUM_COLS], int linec){
 		switch(filelines[i][0]){
 			case 'J':
 			case 'j':
-				tokind = tokfind(filelines[i], '[', ']', temptok, tokind);
+				tokind = tokfind(filelines[i], '[', ']', temptok, tokind, lentok);
 				//A token was found
 				if(tokind >= 0){
-					cout << "Found jump token: " << temptok << endl;
+					//cout << "Found jump token: " << temptok << endl;
 					//match token to label and replace token with line
 					for(int k = 0; k < labelind; k++){
 						if(nocasewordcmp(temptok, labels[k].label)==0){
 							//convert the line num to char, and then replace [token]
-							//need to implement some kind of itoa
-							//tempnum = itoa(labels[i].line);
 							//Overwrite the label in original array: CHECK AFTERWARDS
-							copy(tempnum, tempnum+lennum, filelines[i]);
+							//cout << "Found tok " << labels[k].line << " " << temptok << endl;
+							int leftind = tokind-lentok;
+							//quite cludgy and absolutely memory unsafe, but works
+							lennum = sprintf(filelines[i]+tokind-lentok, "%d", labels[k].line);
+							//cout << "tok " << tokind << " len: " << lennum << endl;
+							filelines[i][leftind+lennum] = '\n';
+							filelines[i][leftind+lennum+1] = '\0';
+							//cout << "len: " << lennum << endl;
+							cout << "Line now: " << filelines[i] << endl;
 						}
 					}
 					
@@ -1439,7 +1446,7 @@ bool isDupLabel(char label[], labeldata labels[], int numlabels){
 	return false;
 }
 
-int tokfind(char src[], const char ltok, const char rtok, char token[], int ind){
+int tokfind(char src[], const char ltok, const char rtok, char token[], int ind, int& lentok){
 	int indl, indr; //left and right index
 	enum states{NOTOK, LTOK, RTOK};
 	states s = NOTOK;
@@ -1472,6 +1479,7 @@ int tokfind(char src[], const char ltok, const char rtok, char token[], int ind)
 					//To implement: own strcpy function
 					copy(src+indl+1, src+indr, token);
 					token[indr-indl-1] = '\0';
+					lentok = indr-indl;
 					return indr;
 					/*END NON NATIVE*/
 				}

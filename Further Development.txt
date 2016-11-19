@@ -10,7 +10,6 @@ Jump to invalid label
 An opcode has an invalid value attached to it: ex SD1 or SDR1
 Same label appears twice
 
-
 More code than space for code (code overflows label)
 
 
