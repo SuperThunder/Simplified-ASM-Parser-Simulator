@@ -52,6 +52,7 @@ int nocasewordcmp(char str1[], char str2[]);
 int labelLookup(char label[], labeldata* labels[], int len);
 int preparse(char filelines[][NUM_COLS], int linec);
 bool isDupLabel(char label[], labeldata labels[], int len);
+int tokfind(char src[], const char ltok, const char rtok, char token[], int ind);
 void dispStats(opline opdata[], int opcount);
 void dispData(opline opcodes[], labeldata labels[], int opnum, int labnum);
 
@@ -1253,40 +1254,24 @@ int preparse(char filelines[][NUM_COLS], int linec){
 	
 	for(int i = 0; i < linec; i++){
 		curfl = i+1; //i is 0 indexed, the file line is 1 indexed
-		//First, check for a label
-		//labelline finds the line of the label, and stores them in the labels struct array
-
 		//cout << "Label: " << labelline << "Prevlabel: " << prevlabelline << endl;
-		//Have this to deal with unused lines
+		//Have this to deal with unused lines (which are marked as comment)
 		if(filelines[i][0] == '#'){
-			//cout << "Skipping non code line" << i << endl;
 			continue;
 		}
-		
-		//cout << curfl << "\t";
-		
 		labelline = findlabel(filelines[i], labeltemp, &labels[labelind]);
 		if(labelline >= 0){
-			//check if we got the code label
-			//cout << "Checking: " << labels[labelind].label << endl;
 			if(isDupLabel(labels[labelind].label, labels, labelind-1)){
-				//cout << "Duplicate label was found" << endl;
-				//return -1; //every duplicate needs to be caught
 			}
 			
 			if(nocasewordcmp("CODE", labels[labelind].label) == 0){
-			//handles special case of code label being found
 				if(foundcode){
-					//cerr << "Error on line " << curfl <<  " duplicated Code directive label with value " << labelline << endl;
-					//return -1;
 				}
-				//no value for code label
 				else if(labelline == -2){	
 				}
 				else{
 					foundcode = true;
 					prevwaslabel = true;
-					//cout << "Code: " << labelline << endl;
 					labellineoffset = 0; //reset the offset if we're in a new label
 					labelind += 1;
 				}
@@ -1294,87 +1279,38 @@ int preparse(char filelines[][NUM_COLS], int linec){
 			else if(nocasewordcmp("DATA", labels[labelind].label) == 0){
 				//if it was already found
 				if(founddata){
-					//cerr << "Error on line " << curfl << " duplicated Data directive label" << endl;
-					//return -1;
 				}
-				//no value for data label
 				else if(labelline == - 2){	
 				}
 				else{
 					founddata = true;
 					prevwaslabel = true;
-					//we don't reset the line offset for data, because it doesn't refer to code
-					//cout << "Data: " << labelline << endl;
 					labelind += 1;
 					labelline = prevlabelline; //do this as well since DATA label doesn't affect the code
 				}
 			}
 			else{
-				//cout << labeltemp << ": " << labelline << i << endl;
-				//cout << "Now in label " << labels[labelind].label << " at " << labels[labelind].line << endl;
 				labellineoffset = 0; //reset the offset if we're in a new label
 				labelind += 1;
 			}
 		}
 		else if(labelline == -1){
-			/* Don't care about opcodes here, except to go to next line
-			//Just means there wasn't a label, check for opcode
-			if(checkopcode(ufilelines[i], &allopcodes[curopnum])){
-				
-				cout << "Found new opcode " << allopcodes[curopnum].opc;
-				cout << " on line: " << prevlabelline+1 << endl;
-				*/
-				//get and set the operand type values
-				//cout << "Calling giveoptype with: " << filelines[i]+allopcodes[curopnum].oplen << endl;
-				//cout << "\t" << allopcodes[curopnum].opc;
-				//cout << "\t" << allopcodes[curopnum].lnum << endl;
-				//ensure that code directive has already appeared
 				if(!foundcode){
-					//cerr << "Error on line " << curfl << ", code directive must come before any opcodes!" << endl;
-					return -1;
 				}
 				prevwaslabel = false;
-				//allopcodes[curopnum].lnum = prevlabelline + 1;
-				//allopcodes[curopnum].optype = giveoptype(\
-				(filelines[i]+allopcodes[curopnum].oplen), allopcodes[curopnum].opc,\
-				&allopcodes[curopnum]);
-				
-				//cout << "line: " << curfl << " Found new opcode " << allopcodes[curopnum].opc;
-				//cout << " at address: " << allopcodes[curopnum].lnum;
-				//cout << " with type: " << allopcodes[curopnum].optype << endl;
-				//cout << " with length: " << allopcodes[curopnum].oplen << endl;
-				
 				//iterate counters
 				//curopnum += 1;
 				labelline = prevlabelline + 1;
-				labellineoffset += 1;
-			/*}else{
-				//this is out here since after a label line with no value
-				//checkopcode isn't going to be true
-				labelline = prevlabelline; //no +1 here is a very subtle difference
-				*///labellineoffset += 1; //removed this to get rid of extra line from label
-			//possibly deprecated by -2 return code
-			
+				labellineoffset += 1;			
 		}
 		else if(labelline == -2){
-			//We found a label, but it didn't have a specific line
-			//Work off the distance from the known label line
-			//This does rely on people AT LEAST giving the code label a line
-	
 			if(isDupLabel(labels[labelind].label, labels, labelind-1)){
-				//return -1; //no fast fail here
 			}
 			labellineoffset += 0; //ASSUMING NEW LABEL DOESN'T CHANGE ADDRESS
 			labelline = prevlabelline + 0;
-			//if the previous was label, don't give this label new line
 			labels[labelind].line = prevlabelline+0;
-			//this may or may not apply, spec unclear
 			if(!prevwaslabel){
-				//labels[labelind].line++;
 			}
-			//cout << "Now in label " << labeltemp << " at " << labelline << endl;
-			//cout << labels[labelind].label << ": " << labels[labelind].line << endl;
-			//<< " from line " << i << endl;
 			labelind += 1;
 			
 		}
@@ -1384,25 +1320,47 @@ int preparse(char filelines[][NUM_COLS], int linec){
 		}
 		else{
 			//Should be only triggered by error
-			//cerr << "Error on line " << curfl << ", program exiting" << endl; 
-			return -1;
 		}
-			//cout << prevlabelline << " = " << labelline;
 			prevlabelline = labelline;
-		
 	}
 	
-	//totalopcodes = curopnum; //need this to know how long opcode array is
-	/*
-	if(!foundcode){
-		//the code label is meant to be before code
-		cerr << "Error on line 1, no Code directive given" << endl;
-		return -1;
-	}*/
 	
 	cout << "Preparser found labels: " << endl;
 	for(int i = 0; i < labelind; i++){
 		cout << labels[i].line << ": " << labels[i].label << endl;
+	}
+	char temptok[255];
+	char tempnum[255];
+	int templine, lennum;
+	//We've got the labels, now we need to find the jumps to labels
+	int tokind = 0; //current index of string we are scanning
+	for(int i = 0; i < linec; i++){
+		//Find a line starting with "J" or "j"
+		//And having some [...] in it; use a strtok equiv for that
+		switch(filelines[i][0]){
+			case 'J':
+			case 'j':
+				tokind = tokfind(filelines[i], '[', ']', temptok, tokind);
+				//A token was found
+				if(tokind >= 0){
+					cout << "Found jump token: " << temptok << endl;
+					//match token to label and replace token with line
+					for(int k = 0; k < labelind; k++){
+						if(nocasewordcmp(temptok, labels[k].label)==0){
+							//convert the line num to char, and then replace [token]
+							//need to implement some kind of itoa
+							//tempnum = itoa(labels[i].line);
+							//Overwrite the label in original array: CHECK AFTERWARDS
+							copy(tempnum, tempnum+lennum, filelines[i]);
+						}
+					}
+					
+					
+					//need to replace token with address of token
+				}
+			default:
+				break;
+		}
 	}
 	
 	curfl = 0; //quite important to reset file line counter!
@@ -1479,6 +1437,52 @@ bool isDupLabel(char label[], labeldata labels[], int numlabels){
 	}
 	
 	return false;
+}
+
+int tokfind(char src[], const char ltok, const char rtok, char token[], int ind){
+	int indl, indr; //left and right index
+	enum states{NOTOK, LTOK, RTOK};
+	states s = NOTOK;
+	
+	//cout << "Called with: " << src << " " << ltok << rtok << " " << ind << endl;
+	
+	for(int i = 0; src[i] != 0; i++){
+		//cout << src[i] << " i: " << i << endl;
+		//possibly reimplementation: set ltok/rtok to const char and use switch
+		if(src[i] == ltok){
+				//Found left token again: string is improperly tokenized
+				//Trying to validly handle this would be arbitrary and bug prone
+				if(s==LTOK){
+					return -2;
+				}
+				else{
+					s = LTOK;
+					indl = i;
+				}
+		}
+		else if(src[i] == rtok){
+				//Found right token without left token
+				if(s==NOTOK){
+					return -2;
+				}
+				else{
+					s = RTOK;
+					indr = i;
+					/*BEGIN NON NATIVE*/
+					//To implement: own strcpy function
+					copy(src+indl+1, src+indr, token);
+					token[indr-indl-1] = '\0';
+					return indr;
+					/*END NON NATIVE*/
+				}
+		}
+		else if(src[i] == 0){
+			//Not sure if this can ever be reached: to test
+		}
+	}
+	
+	//Should occur on no token found
+	return -1;
 }
 
 //Prints out the stats about the program
