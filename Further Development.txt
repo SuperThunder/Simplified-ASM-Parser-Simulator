@@ -4,7 +4,7 @@ Jump to valid label, ex JMP [Code]
 	or replace labels with numbers
 	preparse file to find all labels, then replace labels with line numbers
 	or create some kind of sentinel for each [] and fill them at the end	
-	
+Address recorded for opcode lines is one too big
 Jump to invalid label
 
 An opcode has an invalid value attached to it: ex SD1 or SDR1

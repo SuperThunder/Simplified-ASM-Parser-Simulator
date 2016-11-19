@@ -50,6 +50,7 @@ bool numchar(char in);
 int wordcmp(char str1[], char str2[]);
 int nocasewordcmp(char str1[], char str2[]);
 int labelLookup(char label[], labeldata* labels[], int len);
+int preparse(char filelines[][NUM_COLS], int linec);
 bool isDupLabel(char label[], labeldata labels[], int len);
 void dispStats(opline opdata[], int opcount);
 void dispData(opline opcodes[], labeldata labels[], int opnum, int labnum);
@@ -92,6 +93,10 @@ int main(int argc, char* argv[]){
 	numlines1 = fillfilelines(filelines, asmin);
 	numlines2 = removecruft(filelines, codelines, numlines1);
 
+
+	//Super important: replaces [label] with the actual address
+	preparse(codelines, numlines2);
+	
 	//cout << "With cruft removed: " << numlines2 << " lines" << endl;
 	
 	for(int i = 0; i < numlines2; i++){
@@ -1225,7 +1230,7 @@ int nocasewordcmp(char str1[], char str2[]){
 //Checks all the labels
 //Error on ind repeats, invalid names, pointing to the same line
 //Fill in line numbers of labels for the jmp commands
-int preparse(char* filelines[]){
+int preparse(char filelines[][NUM_COLS], int linec){
 	//Can take skeleton structure of main to preparse label lines
 	//Go through every line in advance and only use label functions from main
 	//Once the address of every label has been found, they can be filled in
@@ -1238,9 +1243,175 @@ int preparse(char* filelines[]){
 	//second task: check for duplicates, labels on adjacent lines
 	//Could simply go through list and check each value for this
 	
-	
 	//third task: replace every label that is given to a jump with its address
 	
+	//This is a stripped out copy of main, exists purely to preparse labels
+	char labeltemp[NUM_COLS];
+	//opline allopcodes[1000];
+	labeldata labels[250];
+	int numlines1, numlines2, totalopcodes; //Number of lines at each stage
+	int labelline, prevlabelline;
+	int labellineoffset = 0, curopnum = 0, labelind = 0;
+	bool foundcode = false, founddata = false, prevwaslabel;
+	for(int i = 0; i < numlines2; i++){
+		curfl = i+1; //i is 0 indexed, the file line is 1 indexed
+		//First, check for a label
+		//labelline finds the line of the label, and stores them in the labels struct array
+
+		//cout << "Label: " << labelline << "Prevlabel: " << prevlabelline << endl;
+		//Have this to deal with unused lines
+		if(filelines[i][0] == '#'){
+			//cout << "Skipping non code line" << i << endl;
+			continue;
+		}
+		
+		cout << curfl << "\t";
+		
+		labelline = findlabel(filelines[i], labeltemp, &labels[labelind]);
+		if(labelline >= 0){
+			//check if we got the code label
+			//cout << "Checking: " << labels[labelind].label << endl;
+			if(isDupLabel(labels[labelind].label, labels, labelind-1)){
+				cout << "Duplicate label was found" << endl;
+				//return -1; //every duplicate needs to be caught
+			}
+			
+			if(nocasewordcmp("CODE", labels[labelind].label) == 0){
+			//handles special case of code label being found
+				if(foundcode){
+					cerr << "Error on line " << curfl <<  " duplicated Code directive label with value " << labelline << endl;
+					 return -1;
+				}
+				//no value for code label
+				else if(labelline == -2){	
+				}
+				else{
+					foundcode = true;
+					prevwaslabel = true;
+					cout << "Code: " << labelline << endl;
+					labellineoffset = 0; //reset the offset if we're in a new label
+					labelind += 1;
+				}
+			}
+			else if(nocasewordcmp("DATA", labels[labelind].label) == 0){
+				//if it was already found
+				if(founddata){
+					cerr << "Error on line " << curfl << " duplicated Data directive label" << endl;
+					return -1;
+				}
+				//no value for data label
+				else if(labelline == - 2){	
+				}
+				else{
+					founddata = true;
+					prevwaslabel = true;
+					//we don't reset the line offset for data, because it doesn't refer to code
+					cout << "Data: " << labelline << endl;
+					labelind += 1;
+					labelline = prevlabelline; //do this as well since DATA label doesn't affect the code
+				}
+			}
+			else{
+				cout << labeltemp << ": " << labelline << i << endl;
+				//cout << "Now in label " << labels[labelind].label << " at " << labels[labelind].line << endl;
+				labellineoffset = 0; //reset the offset if we're in a new label
+				labelind += 1;
+			}
+		}
+		else if(labelline == -1){
+			//Just means there wasn't a label, check for opcode
+			if(checkopcode(ufilelines[i], &allopcodes[curopnum])){
+				/*
+				cout << "Found new opcode " << allopcodes[curopnum].opc;
+				cout << " on line: " << prevlabelline+1 << endl;
+				*/
+				//get and set the operand type values
+				//cout << "Calling giveoptype with: " << filelines[i]+allopcodes[curopnum].oplen << endl;
+				//cout << "\t" << allopcodes[curopnum].opc;
+				//cout << "\t" << allopcodes[curopnum].lnum << endl;
+				//ensure that code directive has already appeared
+				if(!foundcode){
+					cerr << "Error on line " << curfl << ", code directive must come before any opcodes!" << endl;
+					return -1;
+				}
+				prevwaslabel = false;
+				allopcodes[curopnum].lnum = prevlabelline + 1;
+				allopcodes[curopnum].optype = giveoptype(\
+				(filelines[i]+allopcodes[curopnum].oplen), allopcodes[curopnum].opc,\
+				&allopcodes[curopnum]);
+				
+				//cout << "line: " << curfl << " Found new opcode " << allopcodes[curopnum].opc;
+				//cout << " at address: " << allopcodes[curopnum].lnum;
+				//cout << " with type: " << allopcodes[curopnum].optype << endl;
+				//cout << " with length: " << allopcodes[curopnum].oplen << endl;
+				
+				//iterate counters
+				curopnum += 1;
+				labelline = prevlabelline + 1;
+				labellineoffset += 1;
+			/*}else{
+				//this is out here since after a label line with no value
+				//checkopcode isn't going to be true
+				labelline = prevlabelline; //no +1 here is a very subtle difference
+				*///labellineoffset += 1; //removed this to get rid of extra line from label
+			} //possibly deprecated by -2 return code
+			
+		}
+		else if(labelline == -2){
+			//We found a label, but it didn't have a specific line
+			//Work off the distance from the known label line
+			//This does rely on people AT LEAST giving the code label a line
+			
+			if(isDupLabel(labels[labelind].label, labels, labelind-1)){
+				//return -1; //no fast fail here
+			}
+			labellineoffset += 0; //ASSUMING NEW LABEL DOESN'T CHANGE ADDRESS
+			labelline = prevlabelline + 0;
+			//if the previous was label, don't give this label new line
+			labels[labelind].line = prevlabelline+0;
+			//this may or may not apply, spec unclear
+			if(!prevwaslabel){
+				//labels[labelind].line++;
+			}
+			//cout << "Now in label " << labeltemp << " at " << labelline << endl;
+			cout << labels[labelind].label << ": " << labels[labelind].line << endl;
+			//<< " from line " << i << endl;
+			labelind += 1;
+			
+		}
+		else if(labelline == -3){
+		}
+		else if(labelline == -4){
+		}
+		else{
+			//Should be only triggered by error
+			cerr << "Error on line " << curfl << ", program exiting" << endl; 
+			return -1;
+		}
+			//cout << prevlabelline << " = " << labelline;
+			prevlabelline = labelline;
+		
+	}
+	
+	totalopcodes = curopnum; //need this to know how long opcode array is
+	
+	if(!foundcode){
+		//the code label is meant to be before code
+		cerr << "Error on line 1, no Code directive given" << endl;
+		return -1;
+	}
+	
+	//Calculate and print the stats about the program
+	dispStats(allopcodes, totalopcodes);
+	
+	//Show data collected by program
+	
+	cout << endl << endl << "---------------------------------" << endl;
+	dispData(allopcodes, labels, curopnum, labelind);
+	
+	
+	curfl = 0; //quite important to reset file line counter!
+	return 0;
 	
 }
 
