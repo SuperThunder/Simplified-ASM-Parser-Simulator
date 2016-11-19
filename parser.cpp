@@ -1326,6 +1326,7 @@ int preparse(char filelines[][NUM_COLS], int linec){
 		prevlabelline = labelline;
 	}
 	
+	curfl = 0;
 	
 	cout << "Preparser found labels: " << endl;
 	for(int i = 0; i < labelind; i++){
@@ -1334,8 +1335,9 @@ int preparse(char filelines[][NUM_COLS], int linec){
 	char temptok[255];
 	int templine, lennum, lentok;
 	//We've got the labels, now we need to find the jumps to labels
-	int tokind = 0; //current index of string we are scanning
+	int tokind = 0; //current index of str we are scanning
 	for(int i = 0; i < linec; i++){
+		curfl = i+1;
 		//Find a line starting with "J" or "j"
 		//And having some [...] in it; use a strtok equiv for that
 		switch(filelines[i][0]){
@@ -1344,6 +1346,15 @@ int preparse(char filelines[][NUM_COLS], int linec){
 				tokind = tokfind(filelines[i], '[', ']', temptok, tokind, lentok);
 				//A token was found
 				if(tokind >= 0){
+					//first need to check for invalid chars in the label
+					if(!alphachar(filelines[i][tokind-lentok+1])){
+						cerr << "Error on line " << curfl << " invalid starting character for label: '" << (filelines[i][tokind-lentok+1]) << "'" << endl;
+					}
+					for( int k = tokind-lentok+1; k < tokind; k++){
+						if(!(alphachar(filelines[i][k]) || numchar(filelines[i][k]))){
+							cerr << "Error on line " << curfl << " invalid character for label: " << filelines[i][k] << endl;
+						}
+					}
 					//cout << "Found jump token: " << temptok << endl;
 					//match token to label and replace token with line
 					for(int k = 0; k < labelind; k++){
@@ -1457,7 +1468,7 @@ int tokfind(char src[], const char ltok, const char rtok, char token[], int ind,
 		//cout << src[i] << " i: " << i << endl;
 		//possibly reimplementation: set ltok/rtok to const char and use switch
 		if(src[i] == ltok){
-				//Found left token again: string is improperly tokenized
+				//Found left token again: str is improperly tokenized
 				//Trying to validly handle this would be arbitrary and bug prone
 				if(s==LTOK){
 					return -2;
